@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>현재 생활권 살펴보기</title>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+  <!-- OpenLayers -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: "Noto Sans KR", sans-serif;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* 지도 제목 */
+    .map-title {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: #ff7b54;
+      color: white;
+      padding: 10px 18px;
+      font-weight: bold;
+      border-radius: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    /* 좌측 트리 메뉴 */
+    .side-menu {
+      position: absolute;
+      top: 70px;
+      left: 15px;
+      width: 280px;
+      max-height: 85%;
+      overflow-y: auto;
+      background: rgba(255,255,255,0.97);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      padding: 15px 20px;
+      z-index: 10;
+    }
+
+    .side-menu h3 {
+      margin-top: 0;
+      font-size: 1.1em;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 5px;
+    }
+
+    .side-menu ul {
+      list-style: none;
+      padding-left: 15px;
+    }
+
+    .side-menu li {
+      margin: 6px 0;
+      cursor: pointer;
+    }
+
+    .side-menu li:hover {
+      color: #0078ff;
+      text-decoration: underline;
+    }
+
+    .side-menu .category {
+      font-weight: bold;
+      margin-top: 10px;
+      color: #333;
+    }
+
+    /* 오른쪽 컨트롤 패널 */
+    .control-panel {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 320px;
+      background: rgba(255,255,255,0.97);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      padding: 15px 20px;
+      z-index: 10;
+      overflow-y: auto;
+      max-height: 95%;
+    }
+
+    .control-panel h3 {
+      margin-top: 5px;
+      font-size: 1.05em;
+      border-bottom: 2px solid #f2f2f2;
+      padding-bottom: 5px;
+    }
+
+    .chart-container {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    canvas {
+      width: 100%;
+      max-height: 180px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 지도 -->
+  <div id="map"></div>
+
+  <!-- 지도 제목 -->
+  <div class="map-title">현재 생활권</div>
+
+  <!-- 좌측 사이드 메뉴 -->
+  <div class="side-menu">
+    <h3>현재 생활권</h3>
+    <ul>
+      <li class="category">기초생활권 vs 지역생활권<br><span style="font-size:0.85em; color:#555;">(둘 중 하나 선택)</span></li>
+
+      <ul>
+        <li class="category">기본현황 <span style="font-size:0.8em; color:#777;">(1개 선택)</span></li>
+        <ul>
+          <li>주민등록인구 2023</li>
+          <li>주민등록인구 2024</li>
+          <li>주민등록인구 2025</li>
+        </ul>
+
+        <li class="category">콤팩트성 <span style="font-size:0.8em; color:#777;">(1개 선택)</span></li>
+        <ul>
+          <li>콤팩트1</li>
+          <li>콤팩트2</li>
+          <li>콤팩트3</li>
+        </ul>
+
+        <li class="category">네트워크성 <span style="font-size:0.8em; color:#777;">(1개 선택)</span></li>
+        <ul>
+          <li>네트워크1</li>
+          <li>네트워크2</li>
+          <li>네트워크3</li>
+        </ul>
+
+        <li class="category">생활편리성 <span style="font-size:0.8em; color:#777;">(1개 선택)</span></li>
+        <ul>
+          <li>생활편리성1</li>
+          <li>생활편리성2</li>
+          <li>생활편리성3</li>
+        </ul>
+      </ul>
+    </ul>
+  </div>
+
+  <!-- 오른쪽 컨트롤 패널 -->
+  <div class="control-panel">
+    <h3>인구 집적도 범례 선택</h3>
+    <label><input type="checkbox" checked> 집적도 높음 (상위 25%)</label>
+    <label><input type="checkbox" checked> 상위 25% - 상위 50%</label>
+    <label><input type="checkbox" checked> 상위 50% - 상위 75%</label>
+    <label><input type="checkbox" checked> 집적도 낮음 (하위 25%)</label>
+
+    <div class="chart-container">
+      <h3>선택 지역 비율</h3>
+      <canvas id="densityChart"></canvas>
+      <p style="font-size:0.9em; margin-top:4px;">
+        선택한 지역은 전체 면적의 <strong>11.23%</strong> 입니다.
+      </p>
+    </div>
+
+    <h3>시범 지역 선택</h3>
+    <label><input type="checkbox"> 시범 지역 전체</label>
+    <label><input type="checkbox"> 강원도 원주시</label>
+    <label><input type="checkbox"> 경상북도 안동시</label>
+    <label><input type="checkbox"> 전라북도 정읍시</label>
+    <label><input type="checkbox"> 충청남도 부여군</label>
+    <label><input type="checkbox"> 충청북도 제천시</label>
+    <label><input type="checkbox"> 시도 경계</label>
+  </div>
+
+  <script>
+    // === OpenLayers 기본 지도 ===
+    const map = new ol.Map({
+        target: 'map',
+        layers: [
+        new ol.layer.Tile({
+            source: new ol.source.OSM()
+        })
+        ],
+        view: new ol.View({
+        center: ol.proj.fromLonLat([128.7, 36.56]),
+        zoom: 7
+        })
+    });
+
+    // === gadm41_KOR_1.json 로드 ===
+    fetch('/layer/gadm41_KOR_1')
+        .then(res => res.json())
+        .then(data => {
+        const vectorSource = new ol.source.Vector({
+            features: new ol.format.GeoJSON().readFeatures(data, {
+            featureProjection: 'EPSG:3857' // Web Mercator
+            })
+        });
+
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: '#444',
+                width: 1
+            }),
+            fill: new ol.style.Fill({
+                color: 'rgba(255, 255, 255, 0.1)'
+            })
+            })
+        });
+
+        map.addLayer(vectorLayer);
+        })
+        .catch(err => console.error('GeoJSON load error:', err));
+
+    // === 예시 차트 (Chart.js) ===
+    const ctx = document.getElementById('densityChart');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['선택 지역', '기타 지역'],
+        datasets: [{
+          data: [11.23, 88.77],
+          backgroundColor: ['#ff7b54', '#e0e0e0']
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } }
+      }
+    });
+  </script>
+</body>
+</html>
