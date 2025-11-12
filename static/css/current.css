@@ -1,0 +1,64 @@
+/* Global font setting for consistency */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Main Content and Map Container Styling for Full Height */
+.full-height-flex {
+    height: calc(100vh - 56px);
+    /* Full viewport height minus header height */
+}
+
+#map-container {
+    width: 100%;
+    height: 100%;
+    /* Important: This MUST take up 100% of its parent's height (which is flex-grow) */
+}
+
+.map-wrapper {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    /* Important for grid cells to distribute height */
+}
+
+.map {
+    width: 100%;
+    flex-grow: 1;
+    /* Map div takes remaining space in wrapper */
+    position: relative;
+    /* For absolute positioning of chart overlay */
+}
+
+/* Custom scrollbar for control panel */
+#control-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+#control-panel::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 10px;
+}
+
+/* Chart container styling as overlay on map */
+.radar-chart-overlay {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.radar-chart-overlay canvas {
+    flex: 1;
+}
