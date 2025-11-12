@@ -288,7 +288,7 @@ function updateIndicatorsUI() {
 function displayMessage(title, message) {
     // Create a simple modal/message box dynamically
     const $modal = $(`
-        <div id="custom-alert" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300 opacity-0">
+        <div id="custom-alert" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center transition-opacity duration-300 opacity-0" style="z-index: 9999;">
             <div class="bg-white p-6 rounded-lg shadow-2xl w-80 transform scale-95 transition-transform duration-300">
                 <h3 class="text-lg font-bold ${title === '경고' ? 'text-red-600' : 'text-blue-600'} mb-3">${title}</h3>
                 <p class="text-sm text-gray-700 mb-4">${message}</p>
@@ -387,13 +387,13 @@ function visualizeMap() {
         const mapId = `map-${i + 1}`;
         const indicatorKey = indicatorsToDisplay[i];
 
-        // Create wrapper and map div with chart overlay
+        // Create wrapper and map div with title and chart overlay
         const mapHtml = `
             <div id="${mapId}-wrapper" class="map-wrapper">
-                <div class="text-sm font-semibold text-gray-700 p-2 bg-indigo-50 border-b border-indigo-200 truncate" title="${indicatorKey}">
-                    지도 ${i + 1}: ${indicatorKey}
-                </div>
                 <div id="${mapId}" class="map flex-grow">
+                    <div class="map-title-overlay" title="${indicatorKey}">
+                        지도 ${i + 1}: ${indicatorKey}
+                    </div>
                     <div class="radar-chart-overlay">
                         <canvas id="radarChart-${i + 1}"></canvas>
                     </div>
@@ -431,12 +431,12 @@ function visualizeMap() {
         }, 100);
     }
 
-    // Display message based on the outcome
-    if (allSelectedIndicators.length === 0) {
-        displayMessage('알림', '선택된 지표가 없어 기본 현황(1개 지도)으로 초기화했습니다.');
-    } else {
-        displayMessage('성공', `${numMapsToShow}개의 지표를 ${numMapsToShow}개 지도로 분할하여 시각화했습니다. 지도 뷰가 동기화되었습니다.`);
-    }
+    // // Display message based on the outcome
+    // if (allSelectedIndicators.length === 0) {
+    //     displayMessage('알림', '선택된 지표가 없어 기본 현황(1개 지도)으로 초기화했습니다.');
+    // } else {
+    //     displayMessage('성공', `${numMapsToShow}개의 지표를 ${numMapsToShow}개 지도로 분할하여 시각화했습니다. 지도 뷰가 동기화되었습니다.`);
+    // }
 }
 
 // --- CHART.JS FUNCTIONS ---

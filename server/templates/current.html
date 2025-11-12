@@ -88,10 +88,11 @@
         <div class="flex-grow flex flex-col h-full"> 
             <!-- Map Area - Takes full height, flex-grow -->
             <section class="bg-white rounded-xl shadow-lg flex-grow overflow-hidden p-2">
-                <h2 class="text-base font-semibold text-gray-600 mb-2 px-2">생활권 시각화 지도</h2>
                 <!-- Map Container: Dynamic grid for 1, 2, or 4 maps. h-full is critical here. -->
-                <div id="map-container" class="grid grid-cols-1 gap-1"> 
-                    <div id="map-1-wrapper" class="map-wrapper"><div id="map-1" class="map"></div></div>
+                <div id="map-container" class="grid grid-cols-1 gap-1 h-full"> 
+                    <div id="map-1-wrapper" class="map-wrapper">
+                        <div id="map-1" class="map"></div>
+                    </div>
                 </div>
             </section>
         </div>
