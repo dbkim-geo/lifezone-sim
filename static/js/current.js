@@ -46,7 +46,7 @@ const UNIT_MAPPING = {
         'agr_fac_z_cnt_23': '개',
         'all_hg_fac_cnt_23': '개',
         // 콤팩트성
-        'cp_pratio_23': '%',
+        'cp_c_pratio_23': '%',
         'cp_fac_agg_23': '',
         'cp_ngh_fac_dist_cor_avg_23': 'km',
         'cp_ngh_fac_c_sat_ratio_23': '%',
@@ -135,7 +135,7 @@ const COLUMN_MAPPING = {
         'agr_fac_z_cnt_23': '농기계임대센터 수',
         'all_hg_fac_cnt_23': '고차서비스시설 총 개수',
         // 콤팩트성 (4개)
-        'cp_pratio_23': '중심지 인구 집중도',
+        'cp_c_pratio_23': '중심지 인구 집중도',
         'cp_fac_agg_23': '서비스 복합 집적도',
         'cp_ngh_fac_dist_cor_avg_23': '서비스 근접성',
         'cp_ngh_fac_c_sat_ratio_23': '서비스 충족도',
@@ -199,7 +199,7 @@ const MOCK_DATA = {
                 'wel_fac_z_cnt_23', 'agr_fac_z_cnt_23', 'all_hg_fac_cnt_23'
             ],
             "콤팩트성": [
-                'cp_pratio_23', 'cp_fac_agg_23', 'cp_ngh_fac_dist_cor_avg_23', 'cp_ngh_fac_c_sat_ratio_23'
+                'cp_c_pratio_23', 'cp_fac_agg_23', 'cp_ngh_fac_dist_cor_avg_23', 'cp_ngh_fac_c_sat_ratio_23'
             ],
             "네트워크성": [
                 'nt_uc_road_mins_22', 'nt_uc_pub_trans_mins_23', 'nt_rd_acc_1hr_center_cnt_22',
@@ -387,38 +387,21 @@ async function getLayerExtentFromCapabilities(layerName) {
             layers = xml.querySelectorAll('Layer');
         }
 
-        console.log('Found', layers.length, 'layers in GetCapabilities');
-
-        // Collect all layer names for debugging
-        const allLayerNames = [];
-        for (const layer of layers) {
-            const nameElement = layer.querySelector('Name');
-            if (nameElement) {
-                allLayerNames.push(nameElement.textContent.trim());
-            }
-        }
-        console.log('All available layer names:', allLayerNames);
-        console.log('Looking for:', layerName);
-
         for (const layer of layers) {
             const nameElement = layer.querySelector('Name');
             const layerNameText = nameElement ? nameElement.textContent.trim() : '';
 
             // Try exact match first
             if (layerNameText === layerName) {
-                console.log('Found exact match:', layerNameText);
                 // Find EPSG:5179 bounding box
                 const bboxElements = layer.querySelectorAll('BoundingBox');
-                console.log('Found', bboxElements.length, 'bounding boxes for layer');
                 for (const bbox of bboxElements) {
                     const srs = bbox.getAttribute('SRS') || bbox.getAttribute('CRS');
-                    console.log('BBox SRS:', srs);
                     if (srs === 'EPSG:5179') {
                         const minX = parseFloat(bbox.getAttribute('minx'));
                         const minY = parseFloat(bbox.getAttribute('miny'));
                         const maxX = parseFloat(bbox.getAttribute('maxx'));
                         const maxY = parseFloat(bbox.getAttribute('maxy'));
-                        console.log('Layer extent from GetCapabilities (EPSG:5179):', [minX, minY, maxX, maxY]);
                         return [minX, minY, maxX, maxY];
                     }
                 }
@@ -429,23 +412,18 @@ async function getLayerExtentFromCapabilities(layerName) {
                     const minY = parseFloat(firstBbox.getAttribute('miny'));
                     const maxX = parseFloat(firstBbox.getAttribute('maxx'));
                     const maxY = parseFloat(firstBbox.getAttribute('maxy'));
-                    const srs = firstBbox.getAttribute('SRS') || firstBbox.getAttribute('CRS');
-                    console.log('Layer extent (first bbox, SRS:', srs, '):', [minX, minY, maxX, maxY]);
                     return [minX, minY, maxX, maxY];
                 }
             }
 
             // Try partial match (in case workspace prefix is different)
             if (layerNameText && layerNameText.endsWith(':' + layerName.split(':')[1])) {
-                console.log('Found partial match:', layerNameText, 'for', layerName);
                 const firstBbox = layer.querySelector('BoundingBox');
                 if (firstBbox) {
                     const minX = parseFloat(firstBbox.getAttribute('minx'));
                     const minY = parseFloat(firstBbox.getAttribute('miny'));
                     const maxX = parseFloat(firstBbox.getAttribute('maxx'));
                     const maxY = parseFloat(firstBbox.getAttribute('maxy'));
-                    const srs = firstBbox.getAttribute('SRS') || firstBbox.getAttribute('CRS');
-                    console.log('Layer extent (partial match, SRS:', srs, '):', [minX, minY, maxX, maxY]);
                     return [minX, minY, maxX, maxY];
                 }
             }
@@ -470,8 +448,6 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    console.log('Creating map with layer:', fullLayerName);
-
     // 2. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
     const wmsSource = new ol.source.ImageWMS({
@@ -488,24 +464,12 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
         crossOrigin: 'anonymous'
     });
 
-    // Log the WMS URL for debugging
-    console.log('WMS Source URL:', `${GEOSERVER_URL}/wms`);
-    console.log('WMS Layer Name:', fullLayerName);
-    console.log('WMS Params:', wmsSource.getParams());
-
     const wmsLayer = new ol.layer.Image({
         source: wmsSource,
         zIndex: 1,
         opacity: 1.0 // Make sure it's not transparent
     });
 
-    wmsLayer.getSource().on('imageloadstart', function (event) {
-        console.log('WMS Image Load Start:', event);
-    });
-
-    wmsLayer.getSource().on('imageloadend', function (event) {
-        console.log('WMS Image Load End:', event);
-    });
 
     // 3. Determine View: Use masterView if provided, otherwise create a new one.
     const view = masterView || new ol.View({
@@ -569,11 +533,9 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     if (!masterView) {
         getLayerExtentFromCapabilities(fullLayerName).then(extent => {
             if (extent) {
-                console.log('Fitting view to extent:', extent);
                 newMap.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 500 });
             } else {
                 // Fallback to default extent if GetCapabilities fails
-                console.log('Using default extent');
                 const defaultExtent = [900000, 1550000, 1050000, 1750000];
                 newMap.getView().fit(defaultExtent, { padding: [50, 50, 50, 50], duration: 500 });
             }
@@ -930,8 +892,6 @@ function visualizeMap() {
         selectedIndicators = [firstIndicator];
     }
 
-    console.log(`Displaying 1 map with ${selectedIndicators.length} indicator(s) for navigation:`, selectedIndicators);
-
     const $mapContainer = $('#map-container');
     $mapContainer.empty();
 
@@ -1236,15 +1196,12 @@ async function initRadarChartForMap(mapId) {
                             return datasetLabel;
                         },
                         label: function (context) {
-                            // Second line: indicator Korean name + value + unit
+                            // Second line: indicator Korean name + value (no unit, as it's normalized 0-100)
                             const mapping = COLUMN_MAPPING[currentLevel];
-                            const unitMapping = UNIT_MAPPING[currentLevel] || {};
                             const indicatorKey = context.label;
                             const koreanName = mapping[indicatorKey] || indicatorKey;
-                            const unit = unitMapping[indicatorKey] || '';
                             const valueText = context.parsed.r.toFixed(2);
-                            const unitText = unit ? ` ${unit}` : '';
-                            return koreanName + ' : ' + valueText + unitText;
+                            return koreanName + ' : ' + valueText;
                         }
                     }
                 },
