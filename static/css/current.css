@@ -39,8 +39,12 @@ body {
 }
 
 #control-panel::-webkit-scrollbar-thumb {
-    background: #9ca3af;
+    background: rgba(6, 182, 212, 0.5);
     border-radius: 10px;
+}
+
+#control-panel::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.3);
 }
 
 /* Map title overlay styling */
@@ -48,14 +52,17 @@ body {
     position: absolute;
     top: 10px;
     left: 10px;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(17, 24, 39, 0.9);
+    backdrop-filter: blur(10px);
     border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
     z-index: 1000;
     padding: 8px 12px;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #374151;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
+    color: #67e8f9;
     max-width: calc(100% - 20px);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -66,19 +73,202 @@ body {
 /* Chart container styling as overlay on map */
 .radar-chart-overlay {
     position: absolute;
-    bottom: 10px;
-    right: 10px;
-    width: 200px;
-    height: 200px;
+    bottom: 20px;
+    left: 20px;
+    width: 350px;
+    height: 350px;
     background: rgba(255, 255, 255, 0.95);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 1000;
-    padding: 8px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
 }
 
 .radar-chart-overlay canvas {
     flex: 1;
+}
+
+/* Attribute Popup Styling - Rounded, soft design with transparency */
+.attribute-popup {
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(6, 182, 212, 0.3), 0 2px 8px rgba(6, 182, 212, 0.2);
+    padding: 0;
+    min-width: 800px;
+    max-width: 1000px;
+    max-height: 70vh;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    transform-origin: center bottom;
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Enter animation */
+.attribute-popup-enter {
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+}
+
+.attribute-popup-visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+/* Exit animation */
+.attribute-popup-exit {
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.attribute-popup-content {
+    padding: 12px;
+    overflow-y: auto;
+    max-height: calc(70vh - 50px);
+}
+
+.attribute-popup-title {
+    font-size: 1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #67e8f9, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 8px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(6, 182, 212, 0.4);
+    border-radius: 0;
+}
+
+.attribute-category {
+    margin-bottom: 20px;
+    background: rgba(249, 250, 251, 0.8);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(229, 231, 235, 0.6);
+}
+
+.attribute-category-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4f46e5;
+    margin: 0 0 10px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.attribute-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 4-column layout for attribute list */
+.attribute-list-3col {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.attribute-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: rgba(31, 41, 55, 0.6);
+    border-radius: 6px;
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    transition: all 0.2s ease;
+    white-space: nowrap; /* Prevent text wrapping */
+    min-width: 0; /* Allow flex item to shrink */
+}
+
+.attribute-item:hover {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: rgba(6, 182, 212, 0.5);
+    transform: translateX(2px);
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.2);
+}
+
+.attribute-name {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-weight: 500;
+    flex: 1;
+    margin-right: 8px;
+    white-space: nowrap; /* Prevent text wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0; /* Don't shrink the name */
+}
+
+.attribute-value {
+    font-size: 0.75rem;
+    color: #67e8f9;
+    font-weight: 600;
+    text-align: right;
+    min-width: 60px;
+    white-space: nowrap; /* Prevent text wrapping */
+    flex-shrink: 0; /* Don't shrink the value */
+    margin-left: 4px;
+}
+
+.attribute-popup-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    cursor: pointer;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    font-size: 1.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+    line-height: 1;
+    padding: 0;
+}
+
+.attribute-popup-close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #fca5a5;
+    transform: scale(1.1);
+}
+
+.attribute-popup-close:active {
+    transform: scale(0.95);
+}
+
+/* Custom scrollbar for popup */
+.attribute-popup-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.attribute-popup-content::-webkit-scrollbar-track {
+    background: rgba(243, 244, 246, 0.5);
+    border-radius: 10px;
+}
+
+.attribute-popup-content::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 10px;
+}
+
+.attribute-popup-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.7);
 }
