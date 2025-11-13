@@ -4,6 +4,8 @@ let vectorSource; // Reusable source for all vector layers
 let currentLevel = 'basic'; // 'basic' for 기초생활권, 'regional' for 지역생활권
 let radarCharts = {}; // Object to hold radar charts for each map (key: mapId, value: Chart instance)
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Firestore placeholder
+let currentIndicatorIndex = 0; // Current indicator index for navigation
+let selectedIndicators = []; // Array of selected indicator keys
 
 // GeoServer configuration (loaded from config.js)
 // Development: http://localhost:8088/geoserver
@@ -44,7 +46,7 @@ const UNIT_MAPPING = {
         'agr_fac_z_cnt_23': '개',
         'all_hg_fac_cnt_23': '개',
         // 콤팩트성
-        'cp_pratio_23': '%',
+        'cp_c_pratio_23': '%',
         'cp_fac_agg_23': '',
         'cp_ngh_fac_dist_cor_avg_23': 'km',
         'cp_ngh_fac_c_sat_ratio_23': '%',
@@ -133,7 +135,7 @@ const COLUMN_MAPPING = {
         'agr_fac_z_cnt_23': '농기계임대센터 수',
         'all_hg_fac_cnt_23': '고차서비스시설 총 개수',
         // 콤팩트성 (4개)
-        'cp_pratio_23': '중심지 인구 집중도',
+        'cp_c_pratio_23': '중심지 인구 집중도',
         'cp_fac_agg_23': '서비스 복합 집적도',
         'cp_ngh_fac_dist_cor_avg_23': '서비스 근접성',
         'cp_ngh_fac_c_sat_ratio_23': '서비스 충족도',
@@ -197,7 +199,7 @@ const MOCK_DATA = {
                 'wel_fac_z_cnt_23', 'agr_fac_z_cnt_23', 'all_hg_fac_cnt_23'
             ],
             "콤팩트성": [
-                'cp_pratio_23', 'cp_fac_agg_23', 'cp_ngh_fac_dist_cor_avg_23', 'cp_ngh_fac_c_sat_ratio_23'
+                'cp_c_pratio_23', 'cp_fac_agg_23', 'cp_ngh_fac_dist_cor_avg_23', 'cp_ngh_fac_c_sat_ratio_23'
             ],
             "네트워크성": [
                 'nt_uc_road_mins_22', 'nt_uc_pub_trans_mins_23', 'nt_rd_acc_1hr_center_cnt_22',
@@ -244,6 +246,20 @@ function getAllIndicators() {
         allIndicators = allIndicators.concat(data.categories[category]);
     }
     return allIndicators;
+}
+
+// Function to get only diagnostic indicators (excluding 기본현황)
+function getDiagnosticIndicators() {
+    const data = MOCK_DATA[currentLevel];
+    let diagnosticIndicators = [];
+    // Only include 콤팩트성, 네트워크성, 생활편리성
+    const diagnosticCategories = ['콤팩트성', '네트워크성', '생활편리성'];
+    for (const category of diagnosticCategories) {
+        if (data.categories[category]) {
+            diagnosticIndicators = diagnosticIndicators.concat(data.categories[category]);
+        }
+    }
+    return diagnosticIndicators;
 }
 
 
@@ -371,38 +387,21 @@ async function getLayerExtentFromCapabilities(layerName) {
             layers = xml.querySelectorAll('Layer');
         }
 
-        console.log('Found', layers.length, 'layers in GetCapabilities');
-
-        // Collect all layer names for debugging
-        const allLayerNames = [];
-        for (const layer of layers) {
-            const nameElement = layer.querySelector('Name');
-            if (nameElement) {
-                allLayerNames.push(nameElement.textContent.trim());
-            }
-        }
-        console.log('All available layer names:', allLayerNames);
-        console.log('Looking for:', layerName);
-
         for (const layer of layers) {
             const nameElement = layer.querySelector('Name');
             const layerNameText = nameElement ? nameElement.textContent.trim() : '';
 
             // Try exact match first
             if (layerNameText === layerName) {
-                console.log('Found exact match:', layerNameText);
                 // Find EPSG:5179 bounding box
                 const bboxElements = layer.querySelectorAll('BoundingBox');
-                console.log('Found', bboxElements.length, 'bounding boxes for layer');
                 for (const bbox of bboxElements) {
                     const srs = bbox.getAttribute('SRS') || bbox.getAttribute('CRS');
-                    console.log('BBox SRS:', srs);
                     if (srs === 'EPSG:5179') {
                         const minX = parseFloat(bbox.getAttribute('minx'));
                         const minY = parseFloat(bbox.getAttribute('miny'));
                         const maxX = parseFloat(bbox.getAttribute('maxx'));
                         const maxY = parseFloat(bbox.getAttribute('maxy'));
-                        console.log('Layer extent from GetCapabilities (EPSG:5179):', [minX, minY, maxX, maxY]);
                         return [minX, minY, maxX, maxY];
                     }
                 }
@@ -413,23 +412,18 @@ async function getLayerExtentFromCapabilities(layerName) {
                     const minY = parseFloat(firstBbox.getAttribute('miny'));
                     const maxX = parseFloat(firstBbox.getAttribute('maxx'));
                     const maxY = parseFloat(firstBbox.getAttribute('maxy'));
-                    const srs = firstBbox.getAttribute('SRS') || firstBbox.getAttribute('CRS');
-                    console.log('Layer extent (first bbox, SRS:', srs, '):', [minX, minY, maxX, maxY]);
                     return [minX, minY, maxX, maxY];
                 }
             }
 
             // Try partial match (in case workspace prefix is different)
             if (layerNameText && layerNameText.endsWith(':' + layerName.split(':')[1])) {
-                console.log('Found partial match:', layerNameText, 'for', layerName);
                 const firstBbox = layer.querySelector('BoundingBox');
                 if (firstBbox) {
                     const minX = parseFloat(firstBbox.getAttribute('minx'));
                     const minY = parseFloat(firstBbox.getAttribute('miny'));
                     const maxX = parseFloat(firstBbox.getAttribute('maxx'));
                     const maxY = parseFloat(firstBbox.getAttribute('maxy'));
-                    const srs = firstBbox.getAttribute('SRS') || firstBbox.getAttribute('CRS');
-                    console.log('Layer extent (partial match, SRS:', srs, '):', [minX, minY, maxX, maxY]);
                     return [minX, minY, maxX, maxY];
                 }
             }
@@ -454,8 +448,6 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    console.log('Creating map with layer:', fullLayerName);
-
     // 2. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
     const wmsSource = new ol.source.ImageWMS({
@@ -472,24 +464,12 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
         crossOrigin: 'anonymous'
     });
 
-    // Log the WMS URL for debugging
-    console.log('WMS Source URL:', `${GEOSERVER_URL}/wms`);
-    console.log('WMS Layer Name:', fullLayerName);
-    console.log('WMS Params:', wmsSource.getParams());
-
     const wmsLayer = new ol.layer.Image({
         source: wmsSource,
         zIndex: 1,
         opacity: 1.0 // Make sure it's not transparent
     });
 
-    wmsLayer.getSource().on('imageloadstart', function (event) {
-        console.log('WMS Image Load Start:', event);
-    });
-
-    wmsLayer.getSource().on('imageloadend', function (event) {
-        console.log('WMS Image Load End:', event);
-    });
 
     // 3. Determine View: Use masterView if provided, otherwise create a new one.
     const view = masterView || new ol.View({
@@ -553,11 +533,9 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     if (!masterView) {
         getLayerExtentFromCapabilities(fullLayerName).then(extent => {
             if (extent) {
-                console.log('Fitting view to extent:', extent);
                 newMap.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 500 });
             } else {
                 // Fallback to default extent if GetCapabilities fails
-                console.log('Using default extent');
                 const defaultExtent = [900000, 1550000, 1050000, 1750000];
                 newMap.getView().fit(defaultExtent, { padding: [50, 50, 50, 50], duration: 500 });
             }
@@ -742,11 +720,17 @@ function updateIndicatorsUI() {
 
     for (const category in data.categories) {
         const indicators = data.categories[category];
+        const categoryId = category.replace(/\s/g, '-').toLowerCase(); // Create safe ID for category
 
         // Start of a new category block with aesthetic improvements
         let categoryHtml = `
-            <div class="category-block mb-2 last:mb-0 p-2 border border-cyan-500/30 rounded-xl shadow-lg shadow-cyan-500/10 bg-gray-900/50 backdrop-blur-sm">
-                <p class="text-sm font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-1 border-b border-cyan-500/30 pb-1">${category} (${indicators.length}종)</p>
+            <div class="category-block mb-2 last:mb-0 p-2 border border-sky-200 rounded-xl shadow-md shadow-sky-50 bg-gray-50/80 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-1 border-b border-sky-200 pb-1">
+                    <p class="text-sm font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">${category} (${indicators.length}종)</p>
+                    <button type="button" class="category-toggle-btn text-xs px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-600 rounded transition-colors duration-200" data-category="${categoryId}" data-indicators="${indicators.join(',')}">
+                        전체 선택
+                    </button>
+                </div>
                 <!-- Responsive Grid for indicators: 2 columns on all screens -->
                 <div class="grid grid-cols-2 gap-x-3 gap-y-1">
         `;
@@ -758,9 +742,9 @@ function updateIndicatorsUI() {
             const koreanName = COLUMN_MAPPING[currentLevel][indicator] || indicator;
             categoryHtml += `
                 <div class="flex items-center">
-                    <input id="${id}" type="checkbox" name="indicator" value="${indicator}" class="h-4 w-4 text-cyan-500 border-gray-600 bg-gray-800 rounded focus:ring-cyan-500 focus:ring-2 cursor-pointer">
+                    <input id="${id}" type="checkbox" name="indicator" value="${indicator}" class="h-4 w-4 text-sky-500 border-gray-300 bg-white rounded focus:ring-sky-500 focus:ring-2 cursor-pointer">
                     <!-- Use text-xs for smaller font and title for full name, truncate long names -->
-                    <label for="${id}" class="ml-2 block text-xs text-gray-300 hover:text-cyan-300 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${koreanName}</label>
+                    <label for="${id}" class="ml-2 block text-xs text-gray-700 hover:text-sky-600 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${koreanName}</label>
                 </div>
             `;
         });
@@ -769,14 +753,61 @@ function updateIndicatorsUI() {
         $container.append(categoryHtml);
     }
 
-    // Limit checkbox selection to 4
-    $('input[name="indicator"]').on('change', function () {
-        const checkedCount = $('input[name="indicator"]:checked').length;
-        if (checkedCount > 4) {
-            this.checked = false;
-            displayMessage('경고', '최대 4개의 지표만 선택 가능합니다.');
-        }
+    // Add event handlers for category toggle buttons
+    $('.category-toggle-btn').on('click', function () {
+        const $btn = $(this);
+        const indicators = $btn.data('indicators').split(',');
+        const categoryCheckboxes = indicators.map(ind => `#chk-${ind.replace(/[\s\(\)\/]/g, '_')}`);
+
+        // Check if all indicators in this category are selected
+        const allSelected = categoryCheckboxes.every(selector => $(selector).is(':checked'));
+
+        // Toggle all checkboxes in this category
+        categoryCheckboxes.forEach(selector => {
+            $(selector).prop('checked', !allSelected);
+        });
+
+        // Update button text
+        $btn.text(allSelected ? '전체 선택' : '전체 해제');
+
+        // Trigger change event to update visualization if needed
+        $(categoryCheckboxes[0]).trigger('change');
     });
+
+    // Update button text when individual checkboxes change
+    $('input[name="indicator"]').on('change', function () {
+        updateCategoryToggleButtons();
+    });
+
+    // Initial update of button texts
+    updateCategoryToggleButtons();
+
+    // No limit on checkbox selection (removed 4-item limit)
+}
+
+/**
+ * Update category toggle button texts based on current selection state
+ */
+function updateCategoryToggleButtons() {
+    const data = MOCK_DATA[currentLevel];
+
+    for (const category in data.categories) {
+        const indicators = data.categories[category];
+        const categoryId = category.replace(/\s/g, '-').toLowerCase();
+        const categoryCheckboxes = indicators.map(ind => `#chk-${ind.replace(/[\s\(\)\/]/g, '_')}`);
+
+        // Check if all indicators in this category are selected
+        const allSelected = categoryCheckboxes.every(selector => $(selector).is(':checked'));
+        const noneSelected = categoryCheckboxes.every(selector => !$(selector).is(':checked'));
+
+        // Update button text
+        const $btn = $(`.category-toggle-btn[data-category="${categoryId}"]`);
+        if (allSelected) {
+            $btn.text('전체 해제');
+        } else {
+            $btn.text('전체 선택');
+        }
+    }
 }
 
 /**
@@ -787,11 +818,11 @@ function updateIndicatorsUI() {
 function displayMessage(title, message) {
     // Create a simple modal/message box dynamically
     const $modal = $(`
-        <div id="custom-alert" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center transition-opacity duration-300 opacity-0" style="z-index: 9999;">
-            <div class="bg-white p-6 rounded-lg shadow-2xl w-80 transform scale-95 transition-transform duration-300">
-                <h3 class="text-lg font-bold ${title === '경고' ? 'text-red-600' : 'text-blue-600'} mb-3">${title}</h3>
+        <div id="custom-alert" class="fixed inset-0 bg-gray-400 bg-opacity-50 flex items-center justify-center transition-opacity duration-300 opacity-0" style="z-index: 9999;">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-80 transform scale-95 transition-transform duration-300 border border-gray-200">
+                <h3 class="text-lg font-bold ${title === '경고' ? 'text-red-500' : 'text-sky-600'} mb-3">${title}</h3>
                 <p class="text-sm text-gray-700 mb-4">${message}</p>
-                <button class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 rounded-lg" onclick="$('#custom-alert').remove()">확인</button>
+                <button class="w-full bg-sky-400 hover:bg-sky-500 text-white font-medium py-2 rounded-lg transition-colors duration-200" onclick="$('#custom-alert').remove()">확인</button>
             </div>
         </div>
     `);
@@ -807,10 +838,10 @@ $('#living-area-toggle').on('click', 'button', function () {
     if (currentLevel === selectedLevel) return;
 
     // Update UI state
-    $('#living-area-toggle button').removeClass('bg-indigo-600 text-white shadow-md hover:bg-gray-200 text-gray-700')
-        .addClass('text-gray-700 hover:bg-gray-200');
-    $(this).removeClass('text-gray-700 hover:bg-gray-200')
-        .addClass('bg-indigo-600 text-white shadow-md');
+    $('#living-area-toggle button').removeClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white shadow-md')
+        .addClass('text-gray-600 hover:text-gray-800 hover:bg-gray-200');
+    $(this).removeClass('text-gray-600 hover:text-gray-800 hover:bg-gray-200')
+        .addClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white shadow-md');
 
     currentLevel = selectedLevel;
     updateIndicatorsUI();
@@ -830,7 +861,7 @@ $('#living-area-toggle').on('click', 'button', function () {
 
 
 /**
- * '시각화하기' button handler. Implements map splitting and ensures correct grid layout.
+ * '시각화하기' button handler. Single map with arrow navigation.
  */
 $('#visualize-button').on('click', visualizeMap);
 
@@ -847,111 +878,127 @@ function visualizeMap() {
     });
     radarCharts = {};
 
-    const allSelectedIndicators = $('input[name="indicator"]:checked').map(function () {
+    // Get selected indicators
+    selectedIndicators = $('input[name="indicator"]:checked').map(function () {
         return $(this).val();
     }).get();
 
-    // 체크된 항목 개수에 따라 자동으로 지도 개수 결정
-    const checkedCount = allSelectedIndicators.length;
-    let numMapsToShow;
+    // Reset to first indicator
+    currentIndicatorIndex = 0;
 
-    if (checkedCount === 0) {
-        numMapsToShow = 1; // 기본값: 1개
-    } else {
-        numMapsToShow = checkedCount; // 체크된 개수만큼 표시
-    }
-
-    const indicatorsToDisplay = allSelectedIndicators.slice(0, numMapsToShow);
-
-    if (indicatorsToDisplay.length === 0) {
-        // Fallback to the first indicator from 기본현황 (if 0 selected)
+    // If no indicators selected, use first from 기본현황
+    if (selectedIndicators.length === 0) {
         const firstIndicator = MOCK_DATA[currentLevel].categories["기본현황"][0];
-        indicatorsToDisplay.push(firstIndicator);
+        selectedIndicators = [firstIndicator];
     }
-
-    console.log(`Displaying ${numMapsToShow} map(s) with indicators:`, indicatorsToDisplay);
 
     const $mapContainer = $('#map-container');
     $mapContainer.empty();
 
-    // === 1. 지도 컨테이너 레이아웃 설정 (체크된 개수에 따라 자동 결정) ===
-    let gridLayout = '';
-    // Tailwind CSS classes for grid layout
-    if (numMapsToShow === 1) {
-        gridLayout = 'grid-cols-1 grid-rows-1'; // 1개: 1x1
-    } else if (numMapsToShow === 2) {
-        gridLayout = 'grid-cols-2 grid-rows-1'; // 2개: 좌우 분할 (1x2)
-    } else if (numMapsToShow === 3) {
-        gridLayout = 'grid-cols-2 grid-rows-2'; // 3개: 2x2 그리드에 3개 배치
-    } else if (numMapsToShow === 4) {
-        gridLayout = 'grid-cols-2 grid-rows-2'; // 4개: 2x2 분할
-    }
-    // Add h-full back to ensure it takes available height
-    $mapContainer.attr('class', `h-full grid gap-1 ${gridLayout}`);
+    // Create single map container with navigation arrows
+    const mapId = 'map-1';
+    const currentIndicator = selectedIndicators[currentIndicatorIndex];
+    const mapping = COLUMN_MAPPING[currentLevel];
+    const koreanName = mapping[currentIndicator] || currentIndicator;
 
-    // === 2. 지도 생성 및 시각화 ===
-    let masterView = null; // 마스터 뷰를 저장할 변수
-
-    for (let i = 0; i < numMapsToShow; i++) {
-        const mapId = `map-${i + 1}`;
-        const indicatorKey = indicatorsToDisplay[i];
-
-        // Get Korean name for the indicator
-        const mapping = COLUMN_MAPPING[currentLevel];
-        const koreanName = mapping[indicatorKey] || indicatorKey;
-
-        // Create wrapper and map div with title and chart overlay
-        const mapHtml = `
-            <div id="${mapId}-wrapper" class="map-wrapper">
-                <div id="${mapId}" class="map flex-grow">
-                    <div class="map-title-overlay" title="${koreanName}">
-                        ${koreanName}
-                    </div>
-                    <div class="radar-chart-overlay">
-                        <canvas id="radarChart-${i + 1}"></canvas>
-                    </div>
+    // Create map HTML with navigation arrows
+    const mapHtml = `
+        <div id="${mapId}-wrapper" class="map-wrapper relative">
+            ${selectedIndicators.length > 1 ? `
+                <button id="prev-indicator" class="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/95 hover:bg-white text-sky-600 rounded-full p-2 shadow-md border border-sky-200 transition-all duration-200 ${currentIndicatorIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 hover:border-sky-300'}" title="이전 지표">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                </button>
+                <button id="next-indicator" class="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/95 hover:bg-white text-sky-600 rounded-full p-2 shadow-md border border-sky-200 transition-all duration-200 ${currentIndicatorIndex === selectedIndicators.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 hover:border-sky-300'}" title="다음 지표">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            ` : ''}
+            <div id="${mapId}" class="map flex-grow">
+                <div class="map-title-overlay" title="${koreanName}">
+                    ${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})
+                </div>
+                <div class="radar-chart-overlay">
+                    <canvas id="radarChart-1"></canvas>
                 </div>
             </div>
-        `;
-        $mapContainer.append(mapHtml);
+        </div>
+    `;
+    $mapContainer.attr('class', 'h-full');
+    $mapContainer.append(mapHtml);
 
-        // Initialize OpenLayers Map
-        const key = (allSelectedIndicators.length === 0 && i === 0) ? 'DEFAULT_GREY' : indicatorKey;
+    // Create single map
+    const newMap = createSingleMap(mapId, currentIndicator, null);
+    activeMaps.push(newMap);
 
-        let newMap;
-        if (i === 0) {
-            // 첫 번째 지도(마스터)를 생성하고 뷰를 저장합니다.
-            newMap = createSingleMap(mapId, key, null); // masterView = null, so it creates a new ol.View
-            masterView = newMap.getView();
-        } else {
-            // 나머지 지도는 마스터 뷰를 공유하도록 생성합니다.
-            newMap = createSingleMap(mapId, key, masterView);
+    // Initialize radar chart
+    setTimeout(async () => {
+        newMap.updateSize();
+        const chart = await initRadarChartForMap(mapId);
+        if (chart) {
+            chart.map = newMap;
         }
+    }, 100);
 
-        activeMaps.push(newMap);
-
-        // For WMS layers, default styling is handled server-side
-        // No need to apply grey style for WMS
-
-        // Manually trigger map resize/render after DOM manipulation
-        // This is crucial for OpenLayers in dynamic layouts
-        setTimeout(async () => {
-            newMap.updateSize();
-            // Initialize radar chart for this map
-            const chart = await initRadarChartForMap(mapId);
-            // Store map reference in chart for later use
-            if (chart) {
-                chart.map = newMap;
+    // Setup navigation arrows
+    if (selectedIndicators.length > 1) {
+        $('#prev-indicator').on('click', function () {
+            if (currentIndicatorIndex > 0) {
+                currentIndicatorIndex--;
+                updateMapIndicator();
             }
-        }, 100);
+        });
+
+        $('#next-indicator').on('click', function () {
+            if (currentIndicatorIndex < selectedIndicators.length - 1) {
+                currentIndicatorIndex++;
+                updateMapIndicator();
+            }
+        });
+    }
+}
+
+/**
+ * Update map to show current indicator
+ */
+function updateMapIndicator() {
+    if (selectedIndicators.length === 0) return;
+
+    const currentIndicator = selectedIndicators[currentIndicatorIndex];
+    const mapping = COLUMN_MAPPING[currentLevel];
+    const koreanName = mapping[currentIndicator] || currentIndicator;
+
+    // Update map title
+    $('.map-title-overlay').text(`${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})`);
+
+    // Update map indicator key
+    if (activeMaps.length > 0) {
+        const map = activeMaps[0];
+        map.set('indicatorKey', currentIndicator);
+
+        // Update WMS layer params to reflect new indicator
+        const wmsLayer = map.getLayers().getArray().find(layer =>
+            layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
+        );
+        if (wmsLayer) {
+            // Note: WMS styling is server-side, so we just update the stored indicator key
+            // The actual visualization may need server-side SLD changes
+        }
     }
 
-    // // Display message based on the outcome
-    // if (allSelectedIndicators.length === 0) {
-    //     displayMessage('알림', '선택된 지표가 없어 기본 현황(1개 지도)으로 초기화했습니다.');
-    // } else {
-    //     displayMessage('성공', `${numMapsToShow}개의 지표를 ${numMapsToShow}개 지도로 분할하여 시각화했습니다. 지도 뷰가 동기화되었습니다.`);
-    // }
+    // Update navigation arrows
+    if (selectedIndicators.length > 1) {
+        $('#prev-indicator').toggleClass('opacity-50 cursor-not-allowed', currentIndicatorIndex === 0);
+        $('#next-indicator').toggleClass('opacity-50 cursor-not-allowed', currentIndicatorIndex === selectedIndicators.length - 1);
+    }
+
+    // Update radar chart
+    const mapId = 'map-1';
+    if (radarCharts[mapId]) {
+        initRadarChartForMap(mapId);
+    }
 }
 
 // --- CHART.JS FUNCTIONS ---
@@ -977,12 +1024,18 @@ function normalizeValue(value, min, max, reverse = false) {
 }
 
 /**
- * Fetch average data for all regions from GeoServer and normalize
+ * Fetch average data for selected diagnostic indicators from GeoServer and normalize
  * This will be used to show overall average in radar chart
+ * Only includes selected diagnostic indicators (콤팩트성, 네트워크성, 생활편리성)
  * @returns {Promise<Object>} Promise resolving to { labels, data } for normalized average values
  */
 async function fetchAverageDataForAllIndicators() {
-    const labels = getAllIndicators();
+    // Get only selected diagnostic indicators
+    const diagnosticIndicators = getDiagnosticIndicators();
+    // Filter selected indicators to only include diagnostic ones
+    const labels = selectedIndicators.length > 0
+        ? selectedIndicators.filter(ind => diagnosticIndicators.includes(ind))
+        : diagnosticIndicators; // If nothing selected, show all diagnostic indicators
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
     const reverseIndicators = REVERSE_INDICATORS[currentLevel] || [];
@@ -1143,15 +1196,12 @@ async function initRadarChartForMap(mapId) {
                             return datasetLabel;
                         },
                         label: function (context) {
-                            // Second line: indicator Korean name + value + unit
+                            // Second line: indicator Korean name + value (no unit, as it's normalized 0-100)
                             const mapping = COLUMN_MAPPING[currentLevel];
-                            const unitMapping = UNIT_MAPPING[currentLevel] || {};
                             const indicatorKey = context.label;
                             const koreanName = mapping[indicatorKey] || indicatorKey;
-                            const unit = unitMapping[indicatorKey] || '';
                             const valueText = context.parsed.r.toFixed(2);
-                            const unitText = unit ? ` ${unit}` : '';
-                            return koreanName + ' : ' + valueText + unitText;
+                            return koreanName + ' : ' + valueText;
                         }
                     }
                 },
@@ -1199,7 +1249,12 @@ async function updateRadarChartWithFeature(mapId, regionName, props) {
         return;
     }
 
-    const allIndicators = getAllIndicators();
+    // Get only selected diagnostic indicators
+    const diagnosticIndicators = getDiagnosticIndicators();
+    // Filter selected indicators to only include diagnostic ones
+    const allIndicators = selectedIndicators.length > 0
+        ? selectedIndicators.filter(ind => diagnosticIndicators.includes(ind))
+        : diagnosticIndicators; // If nothing selected, show all diagnostic indicators
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
     const reverseIndicators = REVERSE_INDICATORS[currentLevel] || [];

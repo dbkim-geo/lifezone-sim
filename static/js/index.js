@@ -1,7 +1,6 @@
 // 페이지 전환
 $('#btn-current').click(() => window.location.href = '/current');
 $('#btn-simulation').click(() => window.location.href = '/simulation');
-$('#btn-intent').click(() => window.location.href = '/intent');
 
 // 패럴랙스 효과 (마우스 움직임)
 const svg = document.getElementById('map-svg');

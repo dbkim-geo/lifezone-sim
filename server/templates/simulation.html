@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>장래 생활권 시뮬레이션</title>
+    <link rel="icon" href="/static/images/favicon.png" type="image/png">
+    <!-- Tailwind CSS (Aesthetics and Responsiveness) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Proj4js for EPSG:5179 support -->
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.0/dist/proj4.js"></script>
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.15.1/css/ol.css" type="text/css">
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.15.1/build/ol.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Chart.js (for Bar Chart) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Configuration (must be loaded before simulation.js) -->
+    <script src="/static/js/config.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/simulation.css">
+</head>
+<body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p class="loading-text">시뮬레이션 수행 중...</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-lg border-b border-sky-200 shadow-md shadow-sky-100 p-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">장래 생활권 시뮬레이션</h1>
+        <div class="flex gap-3 items-center">
+            <a href="/current" class="px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-medium rounded-lg transition-all duration-200 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
+                현재 생활권 살펴보기
+            </a>
+            <button id="intent-modal-btn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 shadow-sm border border-gray-300 hover:border-sky-300">
+                기획 의도
+            </button>
+        </div>
+    </header>
+
+    <!-- 기획 의도 모달 -->
+    <div id="intent-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center hidden" style="z-index: 9999;">
+        <div class="bg-white/95 backdrop-blur-lg border border-sky-200 rounded-lg shadow-2xl shadow-sky-100 w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-300">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">기획 의도</h3>
+                    <button id="intent-modal-close" class="text-gray-500 hover:text-sky-500 text-2xl font-bold transition-colors duration-200">&times;</button>
+                </div>
+                <div class="text-gray-700">
+                    <p class="mb-4">기획 의도 내용이 여기에 표시됩니다.</p>
+                    <!-- 추후 상세 내용 추가 예정 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area: Use custom class for height calculation -->
+    <main class="full-height-flex flex flex-row p-4 space-x-4">
+        
+        <!-- Left Control Panel (Sidebar) -->
+        <aside id="control-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 w-80 flex-shrink-0 h-full overflow-y-auto">
+            
+            <!-- 1. 2040년 장래인구분포 -->
+            <div class="mb-2">
+                <label class="block text-sm font-medium text-sky-600 mb-1">2040년 장래인구분포</label>
+                <div class="flex items-center">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="population-2040-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-400"></div>
+                        <span class="ml-3 text-sm text-gray-700" id="population-2040-label">Off</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. 지역생활권수 -->
+            <div class="mb-2 border-t border-sky-200 pt-2">
+                <label class="block text-sm font-medium text-sky-600 mb-1">지역생활권수</label>
+                <select id="regional-count-select" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                    <option value="5" selected>5</option>
+                    <option value="6">6</option>
+                </select>
+            </div>
+
+            <!-- 3. 공간구조목표 시나리오 -->
+            <div class="mb-2 border-t border-sky-200 pt-2">
+                <label class="block text-sm font-medium text-sky-600 mb-1">공간구조목표 시나리오</label>
+                <div class="space-y-2">
+                    <button type="button" id="scenario-m1" class="w-full px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-400 text-white font-medium rounded-lg transition-all duration-200 shadow-md shadow-sky-200" data-scenario="m1" disabled>
+                        콤팩트성 확보
+                    </button>
+                    <button type="button" id="scenario-m2" class="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 border border-gray-300" data-scenario="m2">
+                        콤팩트성 확보 및 배후 인구규모 확보
+                    </button>
+                    <button type="button" id="scenario-m3" class="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 border border-gray-300" data-scenario="m3">
+                        콤팩트성 및 네트워크성 동시 확보
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. 시각화 버튼 -->
+            <div class="mb-2 border-t border-sky-200 pt-2">
+                <button id="simulate-button" class="w-full bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
+                    장래 생활권 시뮬레이션 수행
+                </button>
+            </div>
+
+            <!-- 5. 비교하기 버튼 -->
+            <div class="mb-2">
+                <button id="compare-button" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-gray-300">
+                    비교하기
+                </button>
+            </div>
+        </aside>
+
+        <!-- Center Map Area -->
+        <div class="flex-grow flex flex-col h-full"> 
+            <!-- Map Area - Takes full height, flex-grow -->
+            <section class="bg-white/80 backdrop-blur-lg border border-sky-200 rounded-xl shadow-lg shadow-sky-100 flex-grow overflow-hidden p-2">
+                <!-- Map Container -->
+                <div id="map-container" class="h-full"> 
+                    <div id="map-1-wrapper" class="map-wrapper relative h-full">
+                        <div id="map-1" class="map h-full"></div>
+                        <!-- Population Legend (shown when population layer is on) -->
+                        <div id="population-legend" class="population-legend hidden">
+                            <div class="legend-title">2040년 1Km 거주 격자</div>
+                            <div class="legend-unit">단위 (명)</div>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">1 - 20</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">20 - 100</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">100 - 200</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">200 - 400</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">400 - 600</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">600 - 1,500</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">1,500 - 3,000</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">3,000 - 17,642</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Panel (Bar Charts) -->
+        <aside id="chart-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 w-96 flex-shrink-0 h-full overflow-y-auto flex flex-col">
+            <h3 class="text-lg font-bold text-sky-600 mb-4">시나리오 비교</h3>
+            
+            <!-- Chart Container -->
+            <div class="flex-grow flex flex-col space-y-4">
+                <!-- Average Chart -->
+                <div class="flex-1 flex flex-col">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">전체 평균</h4>
+                    <div class="flex-grow">
+                        <canvas id="barChart-average"></canvas>
+                    </div>
+                </div>
+
+                <!-- Minimum Chart -->
+                <div class="flex-1 flex flex-col">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">최소값</h4>
+                    <div class="flex-grow">
+                        <canvas id="barChart-minimum"></canvas>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Custom JavaScript -->
+    <script src="/static/js/simulation.js"></script>
+
+</body>
+</html>
