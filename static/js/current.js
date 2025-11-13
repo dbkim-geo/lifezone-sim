@@ -762,10 +762,10 @@ function updateIndicatorsUI() {
 
         // Start of a new category block with aesthetic improvements
         let categoryHtml = `
-            <div class="category-block mb-2 last:mb-0 p-2 border border-cyan-500/30 rounded-xl shadow-lg shadow-cyan-500/10 bg-gray-900/50 backdrop-blur-sm">
-                <div class="flex items-center justify-between mb-1 border-b border-cyan-500/30 pb-1">
-                    <p class="text-sm font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">${category} (${indicators.length}종)</p>
-                    <button type="button" class="category-toggle-btn text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded transition-colors duration-200" data-category="${categoryId}" data-indicators="${indicators.join(',')}">
+            <div class="category-block mb-2 last:mb-0 p-2 border border-sky-200 rounded-xl shadow-md shadow-sky-50 bg-gray-50/80 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-1 border-b border-sky-200 pb-1">
+                    <p class="text-sm font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">${category} (${indicators.length}종)</p>
+                    <button type="button" class="category-toggle-btn text-xs px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-600 rounded transition-colors duration-200" data-category="${categoryId}" data-indicators="${indicators.join(',')}">
                         전체 선택
                     </button>
                 </div>
@@ -780,9 +780,9 @@ function updateIndicatorsUI() {
             const koreanName = COLUMN_MAPPING[currentLevel][indicator] || indicator;
             categoryHtml += `
                 <div class="flex items-center">
-                    <input id="${id}" type="checkbox" name="indicator" value="${indicator}" class="h-4 w-4 text-cyan-500 border-gray-600 bg-gray-800 rounded focus:ring-cyan-500 focus:ring-2 cursor-pointer">
+                    <input id="${id}" type="checkbox" name="indicator" value="${indicator}" class="h-4 w-4 text-sky-500 border-gray-300 bg-white rounded focus:ring-sky-500 focus:ring-2 cursor-pointer">
                     <!-- Use text-xs for smaller font and title for full name, truncate long names -->
-                    <label for="${id}" class="ml-2 block text-xs text-gray-300 hover:text-cyan-300 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${koreanName}</label>
+                    <label for="${id}" class="ml-2 block text-xs text-gray-700 hover:text-sky-600 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${koreanName}</label>
                 </div>
             `;
         });
@@ -856,11 +856,11 @@ function updateCategoryToggleButtons() {
 function displayMessage(title, message) {
     // Create a simple modal/message box dynamically
     const $modal = $(`
-        <div id="custom-alert" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center transition-opacity duration-300 opacity-0" style="z-index: 9999;">
-            <div class="bg-white p-6 rounded-lg shadow-2xl w-80 transform scale-95 transition-transform duration-300">
-                <h3 class="text-lg font-bold ${title === '경고' ? 'text-red-600' : 'text-blue-600'} mb-3">${title}</h3>
+        <div id="custom-alert" class="fixed inset-0 bg-gray-400 bg-opacity-50 flex items-center justify-center transition-opacity duration-300 opacity-0" style="z-index: 9999;">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-80 transform scale-95 transition-transform duration-300 border border-gray-200">
+                <h3 class="text-lg font-bold ${title === '경고' ? 'text-red-500' : 'text-sky-600'} mb-3">${title}</h3>
                 <p class="text-sm text-gray-700 mb-4">${message}</p>
-                <button class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 rounded-lg" onclick="$('#custom-alert').remove()">확인</button>
+                <button class="w-full bg-sky-400 hover:bg-sky-500 text-white font-medium py-2 rounded-lg transition-colors duration-200" onclick="$('#custom-alert').remove()">확인</button>
             </div>
         </div>
     `);
@@ -876,10 +876,10 @@ $('#living-area-toggle').on('click', 'button', function () {
     if (currentLevel === selectedLevel) return;
 
     // Update UI state
-    $('#living-area-toggle button').removeClass('bg-indigo-600 text-white shadow-md hover:bg-gray-200 text-gray-700')
-        .addClass('text-gray-700 hover:bg-gray-200');
-    $(this).removeClass('text-gray-700 hover:bg-gray-200')
-        .addClass('bg-indigo-600 text-white shadow-md');
+    $('#living-area-toggle button').removeClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white shadow-md')
+        .addClass('text-gray-600 hover:text-gray-800 hover:bg-gray-200');
+    $(this).removeClass('text-gray-600 hover:text-gray-800 hover:bg-gray-200')
+        .addClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white shadow-md');
 
     currentLevel = selectedLevel;
     updateIndicatorsUI();
@@ -945,12 +945,12 @@ function visualizeMap() {
     const mapHtml = `
         <div id="${mapId}-wrapper" class="map-wrapper relative">
             ${selectedIndicators.length > 1 ? `
-                <button id="prev-indicator" class="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all duration-200 ${currentIndicatorIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}" title="이전 지표">
+                <button id="prev-indicator" class="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/95 hover:bg-white text-sky-600 rounded-full p-2 shadow-md border border-sky-200 transition-all duration-200 ${currentIndicatorIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 hover:border-sky-300'}" title="이전 지표">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                 </button>
-                <button id="next-indicator" class="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 hover:bg-white text-gray-800 rounded-full p-2 shadow-lg transition-all duration-200 ${currentIndicatorIndex === selectedIndicators.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}" title="다음 지표">
+                <button id="next-indicator" class="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white/95 hover:bg-white text-sky-600 rounded-full p-2 shadow-md border border-sky-200 transition-all duration-200 ${currentIndicatorIndex === selectedIndicators.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 hover:border-sky-300'}" title="다음 지표">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>

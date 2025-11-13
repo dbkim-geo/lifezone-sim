@@ -22,30 +22,30 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/current.css">
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex flex-col font-sans">
+<body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
 
     <!-- Header -->
-    <header class="bg-gray-800/90 backdrop-blur-lg border-b border-cyan-500/20 shadow-lg shadow-cyan-500/10 p-4 flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">현재 생활권 살펴보기</h1>
+    <header class="bg-white/90 backdrop-blur-lg border-b border-sky-200 shadow-md shadow-sky-100 p-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">현재 생활권 살펴보기</h1>
         <div class="flex gap-3 items-center">
-            <a href="/intent" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-medium rounded-lg transition-all duration-200 shadow-lg shadow-cyan-500/50 hover:shadow-cyan-500/70 transform hover:scale-105">
+            <a href="/intent" class="px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-medium rounded-lg transition-all duration-200 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
                 장래 생활권 시뮬레이션 하기
             </a>
-            <button id="intent-modal-btn" class="px-4 py-2 bg-gray-700/80 hover:bg-gray-600/80 text-white font-medium rounded-lg transition-all duration-200 shadow-lg border border-gray-600/50 hover:border-cyan-500/50">
+            <button id="intent-modal-btn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 shadow-sm border border-gray-300 hover:border-sky-300">
                 기획 의도
             </button>
         </div>
     </header>
 
     <!-- 기획 의도 모달 -->
-    <div id="intent-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center hidden" style="z-index: 9999;">
-        <div class="bg-gray-800/95 backdrop-blur-lg border border-cyan-500/30 rounded-lg shadow-2xl shadow-cyan-500/20 w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-300">
+    <div id="intent-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center hidden" style="z-index: 9999;">
+        <div class="bg-white/95 backdrop-blur-lg border border-sky-200 rounded-lg shadow-2xl shadow-sky-100 w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-300">
             <div class="p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">기획 의도</h3>
-                    <button id="intent-modal-close" class="text-gray-400 hover:text-cyan-400 text-2xl font-bold transition-colors duration-200">&times;</button>
+                    <h3 class="text-2xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">기획 의도</h3>
+                    <button id="intent-modal-close" class="text-gray-500 hover:text-sky-500 text-2xl font-bold transition-colors duration-200">&times;</button>
                 </div>
-                <div class="text-gray-300">
+                <div class="text-gray-700">
                     <p class="mb-4">기획 의도 내용이 여기에 표시됩니다.</p>
                     <!-- 추후 상세 내용 추가 예정 -->
                 </div>
@@ -57,30 +57,30 @@
     <main class="full-height-flex flex flex-col lg:flex-row p-4 space-y-4 lg:space-y-0 lg:space-x-4">
         
         <!-- Left Control Panel (Sidebar) -->
-        <aside id="control-panel" class="bg-gray-800/80 backdrop-blur-lg border border-cyan-500/20 p-5 rounded-xl shadow-xl shadow-cyan-500/10 lg:w-80 w-full flex-shrink-0 h-auto lg:h-full overflow-y-auto">
+        <aside id="control-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 lg:w-80 w-full flex-shrink-0 h-auto lg:h-full overflow-y-auto">
             <!-- 1. 생활권 구분 토글 -->
             <div class="mb-2">
-                <label class="block text-sm font-medium text-cyan-300 mb-1">생활권 수준</label>
-                <div class="flex bg-gray-900/50 rounded-full p-1 border border-gray-700" id="living-area-toggle">
-                    <button data-level="basic" class="flex-1 py-2 text-sm font-medium rounded-full transition-all duration-200 bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50">
+                <label class="block text-sm font-medium text-sky-600 mb-1">생활권 수준</label>
+                <div class="flex bg-gray-100 rounded-full p-1 border border-gray-300" id="living-area-toggle">
+                    <button data-level="basic" class="flex-1 py-2 text-sm font-medium rounded-full transition-all duration-200 bg-gradient-to-r from-sky-400 to-blue-400 text-white shadow-md shadow-sky-200">
                         기초생활권
                     </button>
-                    <button data-level="regional" class="flex-1 py-2 text-sm font-medium rounded-full text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200">
+                    <button data-level="regional" class="flex-1 py-2 text-sm font-medium rounded-full text-gray-600 hover:text-gray-800 hover:bg-gray-200 transition-all duration-200">
                         지역생활권
                     </button>
                 </div>
             </div>
 
             <!-- 2. 지표 선택 (Dynamic Checkboxes - 2 Column Grid) -->
-            <div class="mb-2 border-t border-cyan-500/20 pt-2">
-                <label class="block text-sm font-medium text-cyan-300 mb-1">시각화 지표 선택 (최대 4개)</label>
+            <div class="mb-2 border-t border-sky-200 pt-2">
+                <label class="block text-sm font-medium text-sky-600 mb-1">시각화 지표 선택 (최대 4개)</label>
                 <div id="indicator-selection" class="">
                     <!-- Dynamic Checkboxes will be inserted here -->
                 </div>
             </div>
 
             <!-- 3. 시각화 버튼 -->
-            <button id="visualize-button" class="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg shadow-cyan-500/50 hover:shadow-cyan-500/70 transform hover:scale-105">
+            <button id="visualize-button" class="w-full bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
                 시각화하기
             </button>
         </aside>
@@ -89,7 +89,7 @@
         <!-- Use h-full here to ensure this column takes the full available height of <main> -->
         <div class="flex-grow flex flex-col h-full"> 
             <!-- Map Area - Takes full height, flex-grow -->
-            <section class="bg-gray-800/80 backdrop-blur-lg border border-cyan-500/20 rounded-xl shadow-xl shadow-cyan-500/10 flex-grow overflow-hidden p-2">
+            <section class="bg-white/80 backdrop-blur-lg border border-sky-200 rounded-xl shadow-lg shadow-sky-100 flex-grow overflow-hidden p-2">
                 <!-- Map Container: Dynamic grid for 1, 2, or 4 maps. h-full is critical here. -->
                 <div id="map-container" class="grid grid-cols-1 gap-1 h-full"> 
                     <div id="map-1-wrapper" class="map-wrapper">
