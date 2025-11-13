@@ -54,10 +54,10 @@
     </div>
 
     <!-- Main Content Area: Use custom class for height calculation -->
-    <main class="full-height-flex flex flex-col lg:flex-row p-4 space-y-4 lg:space-y-0 lg:space-x-4">
+    <main class="full-height-flex flex flex-row p-4 space-x-4">
         
         <!-- Left Control Panel (Sidebar) -->
-        <aside id="control-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 lg:w-80 w-full flex-shrink-0 h-auto lg:h-full overflow-y-auto">
+        <aside id="control-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 w-80 flex-shrink-0 h-full overflow-y-auto">
             
             <!-- 1. 2040년 장래인구분포 -->
             <div class="mb-2">
@@ -111,19 +111,42 @@
             </div>
         </aside>
 
-        <!-- Right Map Area -->
-        <!-- Use h-full here to ensure this column takes the full available height of <main> -->
+        <!-- Center Map Area -->
         <div class="flex-grow flex flex-col h-full"> 
             <!-- Map Area - Takes full height, flex-grow -->
             <section class="bg-white/80 backdrop-blur-lg border border-sky-200 rounded-xl shadow-lg shadow-sky-100 flex-grow overflow-hidden p-2">
-                <!-- Map Container: Dynamic grid for 1, 2, or 4 maps. h-full is critical here. -->
-                <div id="map-container" class="grid grid-cols-1 gap-1 h-full"> 
-                    <div id="map-1-wrapper" class="map-wrapper">
-                        <div id="map-1" class="map"></div>
+                <!-- Map Container -->
+                <div id="map-container" class="h-full"> 
+                    <div id="map-1-wrapper" class="map-wrapper relative h-full">
+                        <div id="map-1" class="map h-full"></div>
                     </div>
                 </div>
             </section>
         </div>
+
+        <!-- Right Panel (Bar Charts) -->
+        <aside id="chart-panel" class="bg-white/80 backdrop-blur-lg border border-sky-200 p-5 rounded-xl shadow-lg shadow-sky-100 w-96 flex-shrink-0 h-full overflow-y-auto flex flex-col">
+            <h3 class="text-lg font-bold text-sky-600 mb-4">시나리오 비교</h3>
+            
+            <!-- Chart Container -->
+            <div class="flex-grow flex flex-col space-y-4">
+                <!-- Average Chart -->
+                <div class="flex-1 flex flex-col">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">전체 평균</h4>
+                    <div class="flex-grow">
+                        <canvas id="barChart-average"></canvas>
+                    </div>
+                </div>
+
+                <!-- Minimum Chart -->
+                <div class="flex-1 flex flex-col">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">최소값</h4>
+                    <div class="flex-grow">
+                        <canvas id="barChart-minimum"></canvas>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </main>
 
     <!-- Custom JavaScript -->

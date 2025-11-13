@@ -70,25 +70,29 @@ body {
     pointer-events: none;
 }
 
-/* Chart container styling as overlay on map */
-.bar-chart-overlay {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    width: 350px;
-    height: 350px;
-    background: rgba(255, 255, 255, 0.98);
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(125, 211, 252, 0.2);
-    border: 1px solid rgba(125, 211, 252, 0.3);
-    z-index: 1000;
-    padding: 12px;
+/* Chart panel styling */
+#chart-panel {
     display: flex;
     flex-direction: column;
 }
 
-.bar-chart-overlay canvas {
-    flex: 1;
+#chart-panel canvas {
+    max-height: 100%;
+    min-height: 200px;
+}
+
+/* Custom scrollbar for chart panel */
+#chart-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chart-panel::-webkit-scrollbar-thumb {
+    background: rgba(125, 211, 252, 0.5);
+    border-radius: 10px;
+}
+
+#chart-panel::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.5);
 }
 
 /* Attribute Popup Styling - Rounded, soft design with transparency */

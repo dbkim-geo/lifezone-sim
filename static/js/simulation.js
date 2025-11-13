@@ -3,7 +3,14 @@ let activeMaps = []; // Array to hold all active ol.Map instances
 let currentScenarioIndex = 0; // Current scenario index for navigation
 let selectedScenarios = []; // Array of selected scenario keys
 let isCompareMode = false; // Whether in compare mode (split screen)
-let barCharts = {}; // Object to hold bar charts for each map
+let barCharts = {
+    average: null,  // Average chart
+    minimum: null,  // Minimum chart
+    clicked: null   // Clicked feature chart (added dynamically)
+};
+let averageData = {}; // Store average data for all scenarios
+let minimumData = {}; // Store minimum data for all scenarios
+let clickedFeatureData = null; // Store clicked feature data
 
 // GeoServer configuration (loaded from config.js)
 const GEOSERVER_URL = typeof window !== 'undefined' && window.GEOSERVER_URL
@@ -222,24 +229,18 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
                     // Highlight the clicked feature
                     highlightClickedFeature(mapInstance, feature.geometry);
 
-                    // Show attribute popup
-                    showAttributePopup(event.coordinate, mapInstance, props);
-
-                    // Update bar chart with clicked feature data
+                    // Update charts with clicked feature data
                     const regionName = props.nm || props.name || props.지역명 || props.NAME || '지역';
-                    await updateBarChartWithFeature(mapId, regionName, props);
+                    await updateChartsWithClickedFeature(regionName, event.coordinate);
                 } else {
-                    hideAttributePopup();
                     removeFeatureHighlight(mapInstance);
-                    resetBarChart(mapId);
+                    resetClickedFeatureFromCharts();
                 }
             })
             .catch(error => {
-                hideAttributePopup();
                 removeFeatureHighlight(mapInstance);
             });
     } else {
-        hideAttributePopup();
         removeFeatureHighlight(mapInstance);
     }
 }
@@ -399,12 +400,22 @@ function visualizeSimulation() {
     activeMaps.forEach(map => map.setTarget(null));
     activeMaps = [];
 
-    Object.keys(barCharts).forEach(mapId => {
-        if (barCharts[mapId]) {
-            barCharts[mapId].destroy();
-        }
-    });
-    barCharts = {};
+    // Destroy existing charts
+    if (barCharts.average) {
+        barCharts.average.destroy();
+        barCharts.average = null;
+    }
+    if (barCharts.minimum) {
+        barCharts.minimum.destroy();
+        barCharts.minimum = null;
+    }
+    if (barCharts.clicked) {
+        barCharts.clicked.destroy();
+        barCharts.clicked = null;
+    }
+    averageData = {};
+    minimumData = {};
+    clickedFeatureData = null;
 
     // Get selected layers
     const selectedLayers = getSelectedLayerNames();
@@ -443,9 +454,6 @@ function visualizeSimulation() {
                 <div class="map-title-overlay" title="${scenarioName}">
                     ${scenarioName} (${currentScenarioIndex + 1}/${selectedLayers.length})
                 </div>
-                <div class="bar-chart-overlay">
-                    <canvas id="barChart-1"></canvas>
-                </div>
             </div>
         </div>
     `;
@@ -462,25 +470,22 @@ function visualizeSimulation() {
         addPopulationLayer(newMap);
     }
 
-    // Initialize bar chart
+    // Initialize bar charts in right panel
     setTimeout(async () => {
         newMap.updateSize();
-        const chart = await initBarChartForMap(mapId);
-        if (chart) {
-            chart.map = newMap;
-        }
+        await fetchAndDisplayChartData();
     }, 100);
 
     // Setup navigation arrows
     if (selectedLayers.length > 1) {
-        $('#prev-scenario').on('click', function() {
+        $('#prev-scenario').on('click', function () {
             if (currentScenarioIndex > 0) {
                 currentScenarioIndex--;
                 updateMapScenario();
             }
         });
 
-        $('#next-scenario').on('click', function() {
+        $('#next-scenario').on('click', function () {
             if (currentScenarioIndex < selectedLayers.length - 1) {
                 currentScenarioIndex++;
                 updateMapScenario();
@@ -492,7 +497,7 @@ function visualizeSimulation() {
 /**
  * Update map to show current scenario
  */
-function updateMapScenario() {
+async function updateMapScenario() {
     const selectedLayers = getSelectedLayerNames();
     if (selectedLayers.length === 0) return;
 
@@ -522,10 +527,23 @@ function updateMapScenario() {
         $('#next-scenario').toggleClass('opacity-50 cursor-not-allowed', currentScenarioIndex === selectedLayers.length - 1);
     }
 
-    // Update bar chart
-    const mapId = 'map-1';
-    if (barCharts[mapId]) {
-        initBarChartForMap(mapId);
+    // Update bar charts if they exist (preserve clicked feature data)
+    if (barCharts.average || barCharts.minimum) {
+        // Store clicked feature data before updating
+        const clickedAvgDataset = barCharts.average ? barCharts.average.data.datasets.find(ds => ds.borderDash) : null;
+        const clickedMinDataset = barCharts.minimum ? barCharts.minimum.data.datasets.find(ds => ds.borderDash) : null;
+
+        await fetchAndDisplayChartData();
+
+        // Restore clicked feature data at the end (rightmost position)
+        if (clickedAvgDataset && barCharts.average) {
+            barCharts.average.data.datasets.push(clickedAvgDataset);
+            barCharts.average.update();
+        }
+        if (clickedMinDataset && barCharts.minimum) {
+            barCharts.minimum.data.datasets.push(clickedMinDataset);
+            barCharts.minimum.update();
+        }
     }
 }
 
@@ -543,7 +561,7 @@ function addPopulationLayer(map) {
     });
 
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${POPULATION_LAYER}`;
-    
+
     const wmsSource = new ol.source.ImageWMS({
         url: `${GEOSERVER_URL}/wms`,
         params: {
@@ -576,7 +594,7 @@ function addPopulationLayer(map) {
  */
 function toggleCompareMode() {
     isCompareMode = !isCompareMode;
-    
+
     if (isCompareMode) {
         // Split screen mode - show 2 maps side by side
         // TODO: Implement split screen visualization
@@ -593,30 +611,118 @@ function toggleCompareMode() {
 // --- CHART.JS FUNCTIONS ---
 
 /**
- * Initialize Bar Chart for a specific map
- * @param {string} mapId The ID of the map (e.g., 'map-1')
+ * Fetch all feature data and calculate average/minimum, then display charts
  */
-async function initBarChartForMap(mapId) {
-    const chartNum = mapId.replace('map-', '');
-    const chartId = `barChart-${chartNum}`;
+async function fetchAndDisplayChartData() {
+    const attributeKeys = ['c_pop40_ratio', '1h_nc_ratio', '1h_over_pop_ratio'];
+    const attributeNames = ['중심지 인구 집중도', '중심지 주변 연결성', '중심지 접근의 형평성'];
+    const regionalCount = $('#regional-count-select').val();
 
-    // Destroy existing chart if it exists
-    if (barCharts[mapId]) {
-        barCharts[mapId].destroy();
+    // Labels: only 3 attributes (no scenario names)
+    const labels = attributeNames;
+
+    // Initialize charts if not already initialized
+    if (!barCharts.average) {
+        initBarChart('average', 'barChart-average', labels);
+    } else {
+        barCharts.average.data.labels = labels;
     }
 
-    const canvas = document.getElementById(chartId);
+    if (!barCharts.minimum) {
+        initBarChart('minimum', 'barChart-minimum', labels);
+    } else {
+        barCharts.minimum.data.labels = labels;
+    }
+
+    // Fetch data for all selected scenarios
+    averageData = {};
+    minimumData = {};
+
+    for (const scenario of selectedScenarios) {
+        const layerName = SCENARIO_LAYERS[scenario][regionalCount];
+        if (!layerName) continue;
+
+        const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
+
+        try {
+            // Use WFS to get all features
+            const wfsUrl = `${GEOSERVER_URL}/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=${fullLayerName}&outputFormat=application/json&srsName=EPSG:5179`;
+            const response = await fetch(wfsUrl);
+            const data = await response.json();
+
+            if (data.features && data.features.length > 0) {
+                const scenarioName = SCENARIO_NAMES[scenario] || scenario;
+
+                // Calculate average and minimum for each attribute
+                const attributeSums = {};
+                const attributeMins = {};
+                const attributeCounts = {};
+
+                attributeKeys.forEach(key => {
+                    attributeSums[key] = 0;
+                    attributeMins[key] = Infinity;
+                    attributeCounts[key] = 0;
+                });
+
+                data.features.forEach(feature => {
+                    attributeKeys.forEach(key => {
+                        const value = feature.properties[key];
+                        if (value !== undefined && value !== null && !isNaN(value)) {
+                            const numValue = parseFloat(value);
+                            attributeSums[key] += numValue;
+                            attributeCounts[key]++;
+                            if (numValue < attributeMins[key]) {
+                                attributeMins[key] = numValue;
+                            }
+                        }
+                    });
+                });
+
+                // Calculate averages (for each attribute)
+                const avgValues = attributeKeys.map(key => {
+                    return attributeCounts[key] > 0 ? attributeSums[key] / attributeCounts[key] : 0;
+                });
+
+                const minValues = attributeKeys.map(key => {
+                    return attributeMins[key] !== Infinity ? attributeMins[key] : 0;
+                });
+
+                // Store as object with attribute keys for easier access
+                averageData[scenario] = {};
+                minimumData[scenario] = {};
+                attributeKeys.forEach((key, idx) => {
+                    averageData[scenario][key] = avgValues[idx];
+                    minimumData[scenario][key] = minValues[idx];
+                });
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    }
+
+    // Update charts with calculated data
+    updateAverageChart(labels);
+    updateMinimumChart(labels);
+}
+
+/**
+ * Initialize a bar chart
+ * @param {string} chartKey Chart key ('average' or 'minimum')
+ * @param {string} canvasId Canvas element ID
+ * @param {Array} labels Chart labels
+ */
+function initBarChart(chartKey, canvasId, labels) {
+    const canvas = document.getElementById(canvasId);
     if (!canvas) {
         return;
     }
 
     const ctx = canvas.getContext('2d');
 
-    // Initialize empty bar chart
-    barCharts[mapId] = new Chart(ctx, {
+    barCharts[chartKey] = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['중심지 인구 집중도', '중심지 주변 연결성', '중심지 접근의 형평성'],
+            labels: labels,
             datasets: []
         },
         options: {
@@ -625,7 +731,12 @@ async function initBarChartForMap(mapId) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 100
+                    max: 100,
+                    ticks: {
+                        callback: function (value) {
+                            return value + '%';
+                        }
+                    }
                 }
             },
             plugins: {
@@ -636,54 +747,277 @@ async function initBarChartForMap(mapId) {
             }
         }
     });
-
-    return barCharts[mapId];
 }
 
 /**
- * Update Bar Chart with the selected feature's data
- * @param {string} mapId The ID of the map
- * @param {string} regionName
- * @param {Object} props Feature properties
+ * Update average chart with calculated data
+ * @param {Array} labels Chart labels (3 attributes)
  */
-async function updateBarChartWithFeature(mapId, regionName, props) {
-    const chart = barCharts[mapId];
-    if (!chart) {
-        return;
-    }
+function updateAverageChart(labels) {
+    if (!barCharts.average) return;
 
-    // Get attribute values
-    const values = [
-        props.c_pop40_ratio !== undefined && props.c_pop40_ratio !== null ? parseFloat(props.c_pop40_ratio) : 0,
-        props['1h_nc_ratio'] !== undefined && props['1h_nc_ratio'] !== null ? parseFloat(props['1h_nc_ratio']) : 0,
-        props['1h_over_pop_ratio'] !== undefined && props['1h_over_pop_ratio'] !== null ? parseFloat(props['1h_over_pop_ratio']) : 0
-    ];
+    const attributeKeys = ['c_pop40_ratio', '1h_nc_ratio', '1h_over_pop_ratio'];
+    const scenarioColors = {
+        'm1': { bg: 'rgba(59, 130, 246, 0.6)', border: 'rgb(59, 130, 246)' },
+        'm2': { bg: 'rgba(239, 68, 68, 0.6)', border: 'rgb(239, 68, 68)' },
+        'm3': { bg: 'rgba(34, 197, 94, 0.6)', border: 'rgb(34, 197, 94)' }
+    };
 
-    // Remove all existing datasets and add new one
-    chart.data.datasets = [];
-    chart.data.datasets.push({
-        label: regionName,
-        data: values,
-        backgroundColor: 'rgba(239, 68, 68, 0.6)',
-        borderColor: 'rgb(239, 68, 68)',
-        borderWidth: 1
+    // Store clicked feature dataset before clearing
+    const clickedAvgDataset = barCharts.average.data.datasets.find(ds => ds.borderDash);
+
+    // Clear existing datasets (remove all, will add back clicked feature at the end)
+    barCharts.average.data.datasets = [];
+
+    // Add datasets for selected scenarios (max 3)
+    selectedScenarios.forEach(scenario => {
+        if (!averageData[scenario]) return;
+
+        const scenarioName = SCENARIO_NAMES[scenario] || scenario;
+        const colors = scenarioColors[scenario] || { bg: 'rgba(156, 163, 175, 0.6)', border: 'rgb(156, 163, 175)' };
+
+        // Create dataset with data for 3 attributes
+        const datasetData = attributeKeys.map(key => {
+            return averageData[scenario][key] || 0;
+        });
+
+        barCharts.average.data.datasets.push({
+            label: scenarioName,
+            data: datasetData,
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+            borderWidth: 1
+        });
     });
 
-    chart.update();
+    // Add clicked feature dataset at the end (rightmost position)
+    if (clickedAvgDataset) {
+        barCharts.average.data.datasets.push(clickedAvgDataset);
+    }
+
+    barCharts.average.update();
 }
 
 /**
- * Reset Bar Chart
- * @param {string} mapId The ID of the map
+ * Update minimum chart with calculated data
+ * @param {Array} labels Chart labels (3 attributes)
  */
-function resetBarChart(mapId) {
-    const chart = barCharts[mapId];
-    if (!chart) {
+function updateMinimumChart(labels) {
+    if (!barCharts.minimum) return;
+
+    const attributeKeys = ['c_pop40_ratio', '1h_nc_ratio', '1h_over_pop_ratio'];
+    const scenarioColors = {
+        'm1': { bg: 'rgba(59, 130, 246, 0.6)', border: 'rgb(59, 130, 246)' },
+        'm2': { bg: 'rgba(239, 68, 68, 0.6)', border: 'rgb(239, 68, 68)' },
+        'm3': { bg: 'rgba(34, 197, 94, 0.6)', border: 'rgb(34, 197, 94)' }
+    };
+
+    // Store clicked feature dataset before clearing
+    const clickedMinDataset = barCharts.minimum.data.datasets.find(ds => ds.borderDash);
+
+    // Clear existing datasets (remove all, will add back clicked feature at the end)
+    barCharts.minimum.data.datasets = [];
+
+    // Add datasets for selected scenarios (max 3)
+    selectedScenarios.forEach(scenario => {
+        if (!minimumData[scenario]) return;
+
+        const scenarioName = SCENARIO_NAMES[scenario] || scenario;
+        const colors = scenarioColors[scenario] || { bg: 'rgba(156, 163, 175, 0.6)', border: 'rgb(156, 163, 175)' };
+
+        // Create dataset with data for 3 attributes
+        const datasetData = attributeKeys.map(key => {
+            return minimumData[scenario][key] || 0;
+        });
+
+        barCharts.minimum.data.datasets.push({
+            label: scenarioName,
+            data: datasetData,
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+            borderWidth: 1
+        });
+    });
+
+    // Add clicked feature dataset at the end (rightmost position)
+    if (clickedMinDataset) {
+        barCharts.minimum.data.datasets.push(clickedMinDataset);
+    }
+
+    barCharts.minimum.update();
+}
+
+/**
+ * Update charts with clicked feature data
+ * @param {string} regionName
+ * @param {ol.Coordinate} coordinate Clicked coordinate
+ */
+async function updateChartsWithClickedFeature(regionName, coordinate) {
+    const attributeKeys = ['c_pop40_ratio', '1h_nc_ratio', '1h_over_pop_ratio'];
+    const regionalCount = $('#regional-count-select').val();
+
+    // Get map instance
+    const map = activeMaps[0];
+    if (!map) {
         return;
     }
 
-    chart.data.datasets = [];
-    chart.update();
+    const viewResolution = map.getView().getResolution();
+    clickedFeatureData = {};
+
+    // Fetch data from all selected scenario layers
+    for (const scenario of selectedScenarios) {
+        const layerName = SCENARIO_LAYERS[scenario][regionalCount];
+        if (!layerName) continue;
+
+        const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
+
+        // Create temporary WMS source to get feature info
+        const tempWmsSource = new ol.source.ImageWMS({
+            url: `${GEOSERVER_URL}/wms`,
+            params: {
+                'LAYERS': fullLayerName,
+                'TILED': false,
+                'VERSION': '1.1.0',
+                'FORMAT': 'image/png',
+                'TRANSPARENT': true,
+                'SRS': 'EPSG:5179'
+            },
+            serverType: 'geoserver',
+            crossOrigin: 'anonymous'
+        });
+
+        try {
+            const featureInfoUrl = tempWmsSource.getFeatureInfoUrl(
+                coordinate,
+                viewResolution,
+                'EPSG:5179',
+                {
+                    'INFO_FORMAT': 'application/json',
+                    'FEATURE_COUNT': 1
+                }
+            );
+
+            if (featureInfoUrl) {
+                const response = await fetch(featureInfoUrl);
+                const data = await response.json();
+
+                if (data.features && data.features.length > 0) {
+                    const props = data.features[0].properties;
+                    const scenarioName = SCENARIO_NAMES[scenario] || scenario;
+
+                    // Extract attribute values for this scenario
+                    clickedFeatureData[scenario] = {};
+                    attributeKeys.forEach(attrKey => {
+                        clickedFeatureData[scenario][attrKey] = props[attrKey] !== undefined && props[attrKey] !== null
+                            ? parseFloat(props[attrKey])
+                            : 0;
+                    });
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    }
+
+    // Add clicked feature data to both charts
+    addClickedFeatureToCharts(regionName);
+}
+
+/**
+ * Add clicked feature data to average and minimum charts
+ * @param {string} regionName
+ */
+function addClickedFeatureToCharts(regionName) {
+    const attributeKeys = ['c_pop40_ratio', '1h_nc_ratio', '1h_over_pop_ratio'];
+
+    // Calculate average of all selected scenarios for clicked feature
+    let clickedAvgData = [0, 0, 0];
+    let clickedMinData = [Infinity, Infinity, Infinity];
+    let hasData = false;
+
+    selectedScenarios.forEach(scenario => {
+        if (!clickedFeatureData[scenario]) return;
+        hasData = true;
+
+        attributeKeys.forEach((key, idx) => {
+            const value = clickedFeatureData[scenario][key] || 0;
+            clickedAvgData[idx] += value;
+            if (value < clickedMinData[idx]) {
+                clickedMinData[idx] = value;
+            }
+        });
+    });
+
+    if (!hasData) return;
+
+    // Calculate average
+    const scenarioCount = selectedScenarios.filter(s => clickedFeatureData[s]).length;
+    if (scenarioCount > 0) {
+        clickedAvgData = clickedAvgData.map(val => val / scenarioCount);
+    }
+
+    // Handle Infinity values
+    clickedMinData = clickedMinData.map(val => val === Infinity ? 0 : val);
+
+    // Add to average chart
+    if (barCharts.average) {
+        // Remove existing clicked dataset
+        barCharts.average.data.datasets = barCharts.average.data.datasets.filter(
+            ds => !ds.borderDash
+        );
+
+        barCharts.average.data.datasets.push({
+            label: regionName,
+            data: clickedAvgData,
+            backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
+            borderColor: 'rgb(255, 152, 0)',
+            borderWidth: 2,
+            borderDash: [5, 5]
+        });
+        barCharts.average.update();
+    }
+
+    // Add to minimum chart
+    if (barCharts.minimum) {
+        // Remove existing clicked dataset
+        barCharts.minimum.data.datasets = barCharts.minimum.data.datasets.filter(
+            ds => !ds.borderDash
+        );
+
+        barCharts.minimum.data.datasets.push({
+            label: regionName,
+            data: clickedMinData,
+            backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
+            borderColor: 'rgb(255, 152, 0)',
+            borderWidth: 2,
+            borderDash: [5, 5]
+        });
+        barCharts.minimum.update();
+    }
+}
+
+/**
+ * Reset clicked feature data from charts
+ */
+function resetClickedFeatureFromCharts() {
+    clickedFeatureData = null;
+
+    if (barCharts.average) {
+        // Remove all datasets that contain clicked feature (identified by borderDash)
+        barCharts.average.data.datasets = barCharts.average.data.datasets.filter(
+            ds => !ds.borderDash
+        );
+        barCharts.average.update();
+    }
+
+    if (barCharts.minimum) {
+        // Remove all datasets that contain clicked feature (identified by borderDash)
+        barCharts.minimum.data.datasets = barCharts.minimum.data.datasets.filter(
+            ds => !ds.borderDash
+        );
+        barCharts.minimum.update();
+    }
 }
 
 // --- ATTRIBUTE POPUP FUNCTIONS ---
@@ -830,8 +1164,13 @@ $(document).ready(function () {
     // 1. Initialize UI with default values
     initializeUI();
 
-    // 2. 2040년 장래인구분포 toggle
-    $('#population-2040-toggle').on('change', function() {
+    // 2. Auto-visualize on page load (default: m1, k5, population off)
+    setTimeout(() => {
+        visualizeSimulation();
+    }, 500);
+
+    // 3. 2040년 장래인구분포 toggle
+    $('#population-2040-toggle').on('change', function () {
         const isChecked = $(this).is(':checked');
         $('#population-2040-label').text(isChecked ? 'On' : 'Off');
         // Update map if already visualized
@@ -851,20 +1190,16 @@ $(document).ready(function () {
         }
     });
 
-    // 3. 지역생활권수 select
-    $('#regional-count-select').on('change', function() {
-        // Re-visualize if already visualized
-        if (activeMaps.length > 0) {
-            visualizeSimulation();
-        }
-    });
+    // 4. 지역생활권수 select
+    // Note: Map visualization only happens when "장래 생활권 시뮬레이션 수행" button is clicked
+    // No action needed on change event
 
-    // 4. 공간구조목표 시나리오 buttons
-    $('#scenario-m1').on('click', function() {
+    // 5. 공간구조목표 시나리오 buttons
+    $('#scenario-m1').on('click', function () {
         // m1 is always selected, do nothing
     });
 
-    $('#scenario-m2').on('click', function() {
+    $('#scenario-m2').on('click', function () {
         if (selectedScenarios.includes('m2')) {
             selectedScenarios = selectedScenarios.filter(s => s !== 'm2');
         } else {
@@ -873,7 +1208,7 @@ $(document).ready(function () {
         updateScenarioButtons();
     });
 
-    $('#scenario-m3').on('click', function() {
+    $('#scenario-m3').on('click', function () {
         if (selectedScenarios.includes('m3')) {
             selectedScenarios = selectedScenarios.filter(s => s !== 'm3');
         } else {
@@ -882,13 +1217,13 @@ $(document).ready(function () {
         updateScenarioButtons();
     });
 
-    // 5. 시뮬레이션 수행 버튼
+    // 6. 시뮬레이션 수행 버튼
     $('#simulate-button').on('click', visualizeSimulation);
 
-    // 6. 비교하기 버튼
+    // 7. 비교하기 버튼
     $('#compare-button').on('click', toggleCompareMode);
 
-    // 7. Initialize Intent Modal handlers
+    // 8. Initialize Intent Modal handlers
     $('#intent-modal-btn').on('click', openIntentModal);
     $('#intent-modal-close').on('click', closeIntentModal);
 
