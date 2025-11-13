@@ -4,10 +4,10 @@
  */
 
 // Development
-const GEOSERVER_URL = 'http://localhost:8088/geoserver';
+// const GEOSERVER_URL = 'http://localhost:8088/geoserver';
 
 // Production (uncomment for deployment)
-// const GEOSERVER_URL = 'http://14.5.12.41:8088/geoserver';
+const GEOSERVER_URL = 'http://14.5.12.41:8088/geoserver';
 
 const GEOSERVER_WORKSPACE = 'lifesim';
 
