@@ -98,9 +98,13 @@ lifezonesim\Scripts\activate
 # FastAPI 서버 실행
 uvicorn server.main:app --reload --host=0.0.0.0 --port=8081 ## Development
 uvicorn server.main:app --host=0.0.0.0 --port=8080 ## Deploy
+uvicorn server.main:app --host=0.0.0.0 --port=8082 ## Demo Deploy
 ```
+TODO: 
+장래생활권-비교하기 누르면 화면 분할
+기획의도-텍스트&그림&테이블
+베이스지도- V-world 일반
 
-서버가 실행되면 브라우저에서 `http://localhost:8000`으로 접속할 수 있습니다.
 
 ## ✨ 주요 기능
 
