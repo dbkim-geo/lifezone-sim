@@ -396,6 +396,13 @@ function getSelectedLayerNames() {
  * Visualize simulation
  */
 function visualizeSimulation() {
+    // Show loading overlay
+    $('#loading-overlay').removeClass('hidden');
+
+    // FIXME: ##시뮬레이션 수행 시간## (milliseconds)
+    // Adjust this value to control the loading duration
+    const SIMULATION_DURATION = 1500;
+
     // Destroy all existing maps and charts
     activeMaps.forEach(map => map.setTarget(null));
     activeMaps = [];
@@ -435,7 +442,10 @@ function visualizeSimulation() {
     const currentScenario = selectedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
-    // Create map HTML with navigation arrows
+    // Check if population layer should be shown
+    const showPopulation = $('#population-2040-toggle').is(':checked');
+
+    // Create map HTML with navigation arrows and legend
     const mapHtml = `
         <div id="${mapId}-wrapper" class="map-wrapper relative h-full">
             ${selectedLayers.length > 1 ? `
@@ -455,6 +465,45 @@ function visualizeSimulation() {
                     ${scenarioName} (${currentScenarioIndex + 1}/${selectedLayers.length})
                 </div>
             </div>
+            <!-- Population Legend (shown when population layer is on) -->
+            <div id="population-legend" class="population-legend ${showPopulation ? '' : 'hidden'}">
+                <div class="legend-title">2040년 1Km 거주 격자</div>
+                <div class="legend-unit">단위 (명)</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1 - 20</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">20 - 100</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">100 - 200</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">200 - 400</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">400 - 600</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">600 - 1,500</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1,500 - 3,000</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">3,000 - 17,642</span>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
     $mapContainer.attr('class', 'h-full');
@@ -465,15 +514,24 @@ function visualizeSimulation() {
     activeMaps.push(newMap);
 
     // Add population layer if enabled
-    const showPopulation = $('#population-2040-toggle').is(':checked');
     if (showPopulation) {
         addPopulationLayer(newMap);
     }
 
     // Initialize bar charts in right panel
+    const startTime = Date.now();
     setTimeout(async () => {
         newMap.updateSize();
         await fetchAndDisplayChartData();
+
+        // Hide loading overlay after simulation completes
+        // Ensure minimum loading duration for better UX
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, SIMULATION_DURATION - elapsedTime);
+
+        setTimeout(() => {
+            $('#loading-overlay').addClass('hidden');
+        }, remainingTime);
     }, 100);
 
     // Setup navigation arrows
@@ -587,6 +645,25 @@ function addPopulationLayer(map) {
 
     // Add to the top of the layer stack (push adds to the end, which renders on top)
     map.getLayers().push(wmsLayer);
+
+    // Show legend
+    $('#population-legend').removeClass('hidden');
+}
+
+/**
+ * Remove population layer from map
+ * @param {ol.Map} map Map instance
+ */
+function removePopulationLayer(map) {
+    const layers = map.getLayers().getArray();
+    layers.forEach(layer => {
+        if (layer.get('name') === POPULATION_LAYER) {
+            map.removeLayer(layer);
+        }
+    });
+
+    // Hide legend
+    $('#population-legend').addClass('hidden');
 }
 
 /**
@@ -1179,13 +1256,7 @@ $(document).ready(function () {
             if (isChecked) {
                 addPopulationLayer(map);
             } else {
-                // Remove population layer
-                const layers = map.getLayers().getArray();
-                layers.forEach(layer => {
-                    if (layer.get('name') === POPULATION_LAYER) {
-                        map.removeLayer(layer);
-                    }
-                });
+                removePopulationLayer(map);
             }
         }
     });

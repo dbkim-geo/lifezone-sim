@@ -24,11 +24,19 @@
 </head>
 <body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p class="loading-text">시뮬레이션 수행 중...</p>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-white/90 backdrop-blur-lg border-b border-sky-200 shadow-md shadow-sky-100 p-4 flex justify-between items-center z-10">
         <h1 class="text-xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">장래 생활권 시뮬레이션</h1>
         <div class="flex gap-3 items-center">
-            <a href="/current" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 shadow-sm border border-gray-300 hover:border-sky-300">
+            <a href="/current" class="px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-medium rounded-lg transition-all duration-200 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
                 현재 생활권 살펴보기
             </a>
             <button id="intent-modal-btn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 shadow-sm border border-gray-300 hover:border-sky-300">
@@ -119,6 +127,45 @@
                 <div id="map-container" class="h-full"> 
                     <div id="map-1-wrapper" class="map-wrapper relative h-full">
                         <div id="map-1" class="map h-full"></div>
+                        <!-- Population Legend (shown when population layer is on) -->
+                        <div id="population-legend" class="population-legend hidden">
+                            <div class="legend-title">2040년 1Km 거주 격자</div>
+                            <div class="legend-unit">단위 (명)</div>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">1 - 20</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">20 - 100</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">100 - 200</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">200 - 400</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">400 - 600</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">600 - 1,500</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">1,500 - 3,000</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
+                                    <span class="legend-label">3,000 - 17,642</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
