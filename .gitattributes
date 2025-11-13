@@ -1,0 +1,2 @@
+# Always keep deploy version of config.js during merge
+static/js/config.js merge=ours
