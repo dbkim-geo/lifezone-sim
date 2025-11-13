@@ -7,7 +7,4 @@ $(document).ready(function () {
         window.location.href = '/simulation';
     });
 
-    $('#btn-intent').click(function () {
-        window.location.href = '/intent';
-    });
 });

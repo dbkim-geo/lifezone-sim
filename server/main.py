@@ -26,10 +26,6 @@ async def current(request: Request):
 async def simulation(request: Request):
     return templates.TemplateResponse("simulation.html", {"request": request})
 
-@app.get("/intent", response_class=HTMLResponse)
-async def intent(request: Request):
-    return templates.TemplateResponse("intent.html", {"request": request})
-
 @app.get("/layer/{layer_name}")
 async def get_layer(layer_name: str):
     file_path = f"data/{layer_name}.json"
