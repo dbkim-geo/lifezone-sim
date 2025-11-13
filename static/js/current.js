@@ -6,7 +6,7 @@ let radarCharts = {}; // Object to hold radar charts for each map (key: mapId, v
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Firestore placeholder
 
 // GeoServer configuration
-const GEOSERVER_URL = 'http://localhost:8088/geoserver';
+const GEOSERVER_URL = 'http://14.5.12.41:8088/geoserver';
 const GEOSERVER_WORKSPACE = 'lifesim'; // Corrected workspace name
 const LAYER_NAMES = {
     basic: 'current_basic_living_zone',
