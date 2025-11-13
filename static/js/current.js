@@ -6,11 +6,82 @@ let radarCharts = {}; // Object to hold radar charts for each map (key: mapId, v
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Firestore placeholder
 
 // GeoServer configuration
-const GEOSERVER_URL = 'http://14.5.12.41:8088/geoserver';
+const GEOSERVER_URL = 'http://localhost:8088/geoserver';
 const GEOSERVER_WORKSPACE = 'lifesim'; // Corrected workspace name
 const LAYER_NAMES = {
     basic: 'current_basic_living_zone',
     regional: 'current_regional_living_zone'
+};
+
+// Unit mapping: { columnName: unit }
+const UNIT_MAPPING = {
+    basic: {
+        // 기본현황
+        'z_area_km2': 'km²',
+        'c_area_km2': 'km²',
+        'ts_ppop_23': '명',
+        'C_ts_pgrid_cnt_23': '개',
+        'C_ts_ppop_23': '명',
+        'ts_z_pop_den_23': '명/km²',
+        'ts_c_pop_den_23': '명/km²',
+        'hospitals_cnt_23': '개',
+        'foodstore_cnt_22': '개',
+        'ele_schools_cnt_23': '개',
+        'nursery_cnt_23': '개',
+        'eldercare_cnt_24': '개',
+        'all_fac_cnt_23': '개',
+        'emr_fac_z_cnt_23': '개',
+        'unv_fac_z_cnt_23': '개',
+        'cul_fac_z_cnt_23': '개',
+        'lib_fac_z_cnt_23': '개',
+        'wel_fac_z_cnt_23': '개',
+        'agr_fac_z_cnt_23': '개',
+        'all_hg_fac_cnt_23': '개',
+        // 콤팩트성
+        'cp_pratio_23': '%',
+        'cp_fac_agg_23': '',
+        'cp_ngh_fac_dist_cor_avg_23': 'km',
+        'cp_ngh_fac_c_sat_ratio_23': '%',
+        // 네트워크성
+        'nt_uc_road_mins_22': '분',
+        'nt_uc_pub_trans_mins_23': '분',
+        'nt_rd_acc_1hr_center_cnt_22': '개',
+        'nt_pt_acc_1hr_center_cnt_23': '개',
+        'nt_rd_acc_30m_pgrid_ratio_23': '%',
+        'nt_pt_within_30m_rgrid_ratio_23': '%',
+        // 생활편리성
+        'lv_rd_acc_over_30m_pop_ratio_23': '%',
+        'lv_pt_acc_over_30m_pop_ratio_23': '%',
+        'lv_fd_medic_BCcard_ratio_23': '%',
+        'lv_uc_add_fac_type_cnt_23': '개'
+    },
+    regional: {
+        // 기본현황
+        'area_km2': 'km²',
+        'all_C_area_km2': 'km²',
+        'ts_pop_23': '명',
+        'ts_c_pop_23': '명',
+        'ts_pop_den_23': '명/km²',
+        'ts_c_pop_den_23': '명/km²',
+        // 콤팩트성
+        'c_pop_ratio_23': '%',
+        'hg_fac_agg_23': '',
+        'hg_fac_avg_pw_dist_km_23': 'km',
+        'hg_fac_sat_ratio_23': '%',
+        // 네트워크성
+        'daegu_rd_time_mins_25': '분',
+        'daegu_pt_rd_time_mins_25': '분',
+        'c_90m_rd_acc_cnt_23': '개',
+        'c_90m_pt_acc_cnt_23': '개',
+        'nc_60m_rd_acc_ratio_23': '%',
+        'nc_60m_pt_acc_ratio_23': '%',
+        // 생활편리성
+        'within_food_med_trip_ratio_23': '%',
+        '90m_rd_add_hg_fac_type_cnt_23': '개',
+        '90m_pt_add_hg_fac_type_cnt_23': '개',
+        'rd_over_1h_pop_ratio_23': '%',
+        'pt_over_1h_pop_ratio_23': '%'
+    }
 };
 
 // Reverse indicators (higher value is worse - need inverse normalization)
@@ -1066,11 +1137,15 @@ async function initRadarChartForMap(mapId) {
                             return datasetLabel;
                         },
                         label: function (context) {
-                            // Second line: indicator Korean name + value
+                            // Second line: indicator Korean name + value + unit
                             const mapping = COLUMN_MAPPING[currentLevel];
+                            const unitMapping = UNIT_MAPPING[currentLevel] || {};
                             const indicatorKey = context.label;
                             const koreanName = mapping[indicatorKey] || indicatorKey;
-                            return koreanName + ' : ' + context.parsed.r.toFixed(2);
+                            const unit = unitMapping[indicatorKey] || '';
+                            const valueText = context.parsed.r.toFixed(2);
+                            const unitText = unit ? ` ${unit}` : '';
+                            return koreanName + ' : ' + valueText + unitText;
                         }
                     }
                 },
@@ -1268,6 +1343,7 @@ function showAttributePopup(coordinate, map, properties, indicatorKey) {
     content += `<div class="attribute-list attribute-list-3col">`;
 
     // Display all indicators in 3 columns
+    const unitMapping = UNIT_MAPPING[currentLevel] || {};
     allIndicators.forEach((indicatorKey, index) => {
         const koreanName = mapping[indicatorKey] || indicatorKey;
         const value = properties[indicatorKey] !== undefined && properties[indicatorKey] !== null
@@ -1280,9 +1356,13 @@ function showAttributePopup(coordinate, map, properties, indicatorKey) {
             formattedValue = value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
         }
 
+        // Get unit for this indicator
+        const unit = unitMapping[indicatorKey] || '';
+        const valueWithUnit = unit ? `${formattedValue} ${unit}` : formattedValue;
+
         content += `<div class="attribute-item">`;
         content += `<span class="attribute-name">${koreanName}</span>`;
-        content += `<span class="attribute-value">${formattedValue}</span>`;
+        content += `<span class="attribute-value">${valueWithUnit}</span>`;
         content += `</div>`;
     });
 
