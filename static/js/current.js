@@ -448,18 +448,35 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    // 2. Create WMS Image Layer with EPSG:5179
+    // 2. Determine style based on indicatorKey
+    // If indicatorKey matches z_area_km2 or c_area_km2, use corresponding style
+    let styleName = '';
+    if (indicatorKey === 'z_area_km2') {
+        styleName = 'z_area_km2';
+    } else if (indicatorKey === 'c_area_km2') {
+        styleName = 'c_area_km2';
+    }
+    // For other indicators, use default style (empty string = default)
+
+    // 3. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
+    const wmsParams = {
+        'LAYERS': fullLayerName,
+        'TILED': false, // Changed to false for debugging
+        'VERSION': '1.1.0',
+        'FORMAT': 'image/png',
+        'TRANSPARENT': true,
+        'SRS': 'EPSG:5179' // WMS 1.1.0 uses SRS
+    };
+
+    // Add STYLES parameter if style is specified
+    if (styleName) {
+        wmsParams['STYLES'] = styleName;
+    }
+
     const wmsSource = new ol.source.ImageWMS({
         url: `${GEOSERVER_URL}/wms`,
-        params: {
-            'LAYERS': fullLayerName,
-            'TILED': false, // Changed to false for debugging
-            'VERSION': '1.1.0',
-            'FORMAT': 'image/png',
-            'TRANSPARENT': true,
-            'SRS': 'EPSG:5179' // WMS 1.1.0 uses SRS
-        },
+        params: wmsParams,
         serverType: 'geoserver',
         crossOrigin: 'anonymous'
     });
@@ -543,6 +560,168 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     }
 
     return newMap;
+}
+
+/**
+ * Parse SLD file and extract Rule information (colors, labels, etc.)
+ * @param {string} sldContent XML content of SLD file
+ * @returns {Array} Array of rule objects with title, fillColor, strokeColor, strokeWidth
+ */
+function parseSLDRules(sldContent) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(sldContent, 'text/xml');
+
+    // Check for parsing errors
+    const parserError = xmlDoc.querySelector('parsererror');
+    if (parserError) {
+        console.error('Error parsing SLD:', parserError.textContent);
+        return [];
+    }
+
+    const rules = [];
+    const ruleElements = xmlDoc.querySelectorAll('Rule');
+
+    ruleElements.forEach(rule => {
+        // Skip "No Data" rules
+        const titleElement = rule.querySelector('Title');
+        if (!titleElement || titleElement.textContent.trim() === 'No Data') {
+            return;
+        }
+
+        const title = titleElement ? titleElement.textContent.trim() : '';
+
+        // Extract Fill color
+        const fillElement = rule.querySelector('Fill CssParameter[name="fill"]');
+        const fillOpacityElement = rule.querySelector('Fill CssParameter[name="fill-opacity"]');
+        const fillColor = fillElement ? fillElement.textContent.trim() : '#ffffff';
+        const fillOpacity = fillOpacityElement ? parseFloat(fillOpacityElement.textContent.trim()) : 1.0;
+
+        // Convert hex color with opacity to rgba if needed
+        let backgroundColor = fillColor;
+        if (fillOpacity < 1.0 && fillColor.startsWith('#')) {
+            // Convert hex to rgb
+            const r = parseInt(fillColor.slice(1, 3), 16);
+            const g = parseInt(fillColor.slice(3, 5), 16);
+            const b = parseInt(fillColor.slice(5, 7), 16);
+            backgroundColor = `rgba(${r}, ${g}, ${b}, ${fillOpacity})`;
+        }
+
+        // Extract Stroke color and width
+        const strokeElement = rule.querySelector('Stroke CssParameter[name="stroke"]');
+        const strokeWidthElement = rule.querySelector('Stroke CssParameter[name="stroke-width"]');
+        const strokeColor = strokeElement ? strokeElement.textContent.trim() : '#000000';
+        const strokeWidth = strokeWidthElement ? parseFloat(strokeWidthElement.textContent.trim()) : 1;
+
+        rules.push({
+            title: title,
+            fillColor: backgroundColor,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth
+        });
+    });
+
+    return rules;
+}
+
+/**
+ * Fetch and parse SLD file to get legend information
+ * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2')
+ * @returns {Promise<Array>} Promise that resolves to array of rule objects
+ */
+async function fetchSLDRules(styleName) {
+    try {
+        const response = await fetch(`/static/sld/${styleName}.sld`);
+        if (!response.ok) {
+            console.error(`Failed to fetch SLD file: ${styleName}.sld`);
+            return [];
+        }
+        const sldContent = await response.text();
+        return parseSLDRules(sldContent);
+    } catch (error) {
+        console.error(`Error fetching SLD file ${styleName}.sld:`, error);
+        return [];
+    }
+}
+
+/**
+ * Create and display a legend for a map using SLD Rule information.
+ * Uses the same styling as simulation page's population legend.
+ * @param {string} mapId The ID of the map (e.g., 'map-1')
+ * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2')
+ * @param {string} indicatorKey Current indicator key for title
+ */
+async function createLegendForMap(mapId, styleName, indicatorKey) {
+    // Only create legend if style is specified (z_area_km2 or c_area_km2)
+    if (!styleName) {
+        return; // No legend for default style
+    }
+
+    const mapWrapper = document.getElementById(`${mapId}-wrapper`);
+    if (!mapWrapper) {
+        console.warn(`Map wrapper not found: ${mapId}-wrapper`);
+        return;
+    }
+
+    // Remove existing legend if any
+    const existingLegend = mapWrapper.querySelector('.map-legend');
+    if (existingLegend) {
+        existingLegend.remove();
+    }
+
+    // Fetch and parse SLD rules
+    const rules = await fetchSLDRules(styleName);
+    if (rules.length === 0) {
+        console.warn(`No rules found in SLD for style: ${styleName}`);
+        return;
+    }
+
+    // Get indicator display name
+    const indicatorDisplayName = getIndicatorDisplayName(indicatorKey);
+    const unit = UNIT_MAPPING[currentLevel] && UNIT_MAPPING[currentLevel][indicatorKey]
+        ? UNIT_MAPPING[currentLevel][indicatorKey]
+        : '';
+
+    // Create legend items HTML
+    const legendItemsHtml = rules.map(rule => {
+        const borderStyle = rule.strokeWidth > 0
+            ? `border: ${rule.strokeWidth}px solid ${rule.strokeColor};`
+            : 'border: 1px solid #cccccc;';
+
+        return `
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: ${rule.fillColor}; ${borderStyle}"></span>
+                <span class="legend-label">${rule.title}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Create legend container (using same class names as simulation page)
+    const legendContainer = document.createElement('div');
+    legendContainer.className = 'map-legend';
+    legendContainer.innerHTML = `
+        <div class="legend-title">${indicatorDisplayName}</div>
+        ${unit ? `<div class="legend-unit">단위: ${unit}</div>` : ''}
+        <div class="legend-items">
+            ${legendItemsHtml}
+        </div>
+    `;
+
+    // Append to map wrapper
+    mapWrapper.appendChild(legendContainer);
+}
+
+/**
+ * Get display name for indicator key
+ * @param {string} indicatorKey 
+ * @returns {string} Display name
+ */
+function getIndicatorDisplayName(indicatorKey) {
+    // This is a simple mapping - you can expand this based on your needs
+    const displayNames = {
+        'z_area_km2': '기본생활권 면적',
+        'c_area_km2': '핵심생활권 면적'
+    };
+    return displayNames[indicatorKey] || indicatorKey;
 }
 
 
@@ -933,6 +1112,17 @@ function visualizeMap() {
     const newMap = createSingleMap(mapId, currentIndicator, null);
     activeMaps.push(newMap);
 
+    // Create legend for map if style is available
+    let styleName = '';
+    if (currentIndicator === 'z_area_km2') {
+        styleName = 'z_area_km2';
+    } else if (currentIndicator === 'c_area_km2') {
+        styleName = 'c_area_km2';
+    }
+    if (styleName) {
+        createLegendForMap(mapId, styleName, currentIndicator);
+    }
+
     // Initialize radar chart
     setTimeout(async () => {
         newMap.updateSize();
@@ -963,7 +1153,7 @@ function visualizeMap() {
 /**
  * Update map to show current indicator
  */
-function updateMapIndicator() {
+async function updateMapIndicator() {
     if (selectedIndicators.length === 0) return;
 
     const currentIndicator = selectedIndicators[currentIndicatorIndex];
@@ -972,6 +1162,14 @@ function updateMapIndicator() {
 
     // Update map title
     $('.map-title-overlay').text(`${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})`);
+
+    // Determine style based on indicatorKey (move outside of wmsLayer check)
+    let styleName = '';
+    if (currentIndicator === 'z_area_km2') {
+        styleName = 'z_area_km2';
+    } else if (currentIndicator === 'c_area_km2') {
+        styleName = 'c_area_km2';
+    }
 
     // Update map indicator key
     if (activeMaps.length > 0) {
@@ -983,8 +1181,30 @@ function updateMapIndicator() {
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
         if (wmsLayer) {
-            // Note: WMS styling is server-side, so we just update the stored indicator key
-            // The actual visualization may need server-side SLD changes
+            // Update STYLES parameter
+            const updateParams = {};
+            if (styleName) {
+                updateParams['STYLES'] = styleName;
+            } else {
+                // Remove STYLES parameter for default style
+                updateParams['STYLES'] = '';
+            }
+            wmsLayer.getSource().updateParams(updateParams);
+        }
+
+        // Update legend
+        const mapId = 'map-1';
+        if (styleName) {
+            await createLegendForMap(mapId, styleName, currentIndicator);
+        } else {
+            // Remove legend if no style
+            const mapWrapper = document.getElementById(`${mapId}-wrapper`);
+            if (mapWrapper) {
+                const existingLegend = mapWrapper.querySelector('.map-legend');
+                if (existingLegend) {
+                    existingLegend.remove();
+                }
+            }
         }
     }
 
