@@ -85,8 +85,8 @@ const UNIT_MAPPING = {
         'nc_60m_pt_acc_ratio_23': '%',
         // 생활편리성
         'within_food_med_trip_ratio_23': '%',
-        '90m_rd_add_hg_fac_type_cnt_23': '개',
-        '90m_pt_add_hg_fac_type_cnt_23': '개',
+        'r90m_rd_add_hg_fac_type_cnt_23': '개',
+        'r90m_pt_add_hg_fac_type_cnt_23': '개',
         'rd_over_1h_pop_ratio_23': '%',
         'pt_over_1h_pop_ratio_23': '%'
     }
@@ -174,8 +174,8 @@ const COLUMN_MAPPING = {
         'nc_60m_pt_acc_ratio_23': '중심지-주변 연결성(대중교통)',
         // 생활편리성 (5개)
         'within_food_med_trip_ratio_23': '서비스 이용 자족성',
-        '90m_rd_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(도로이동)',
-        '90m_pt_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(대중교통)',
+        'r90m_rd_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(도로이동)',
+        'r90m_pt_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(대중교통)',
         'rd_over_1h_pop_ratio_23': '중심지 접근 형평성(도로이동)',
         'pt_over_1h_pop_ratio_23': '중심지 접근 형평성(대중교통)'
     }
@@ -228,7 +228,7 @@ const MOCK_DATA = {
                 'c_90m_pt_acc_cnt_23', 'nc_60m_rd_acc_ratio_23', 'nc_60m_pt_acc_ratio_23'
             ],
             "생활편리성": [
-                'within_food_med_trip_ratio_23', '90m_rd_add_hg_fac_type_cnt_23', '90m_pt_add_hg_fac_type_cnt_23',
+                'within_food_med_trip_ratio_23', 'r90m_rd_add_hg_fac_type_cnt_23', 'r90m_pt_add_hg_fac_type_cnt_23',
                 'rd_over_1h_pop_ratio_23', 'pt_over_1h_pop_ratio_23'
             ]
         },
@@ -448,31 +448,22 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    // 2. Determine style based on indicatorKey
-    // If indicatorKey matches z_area_km2 or c_area_km2, use corresponding style
-    let styleName = '';
-    if (indicatorKey === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (indicatorKey === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
-    // For other indicators, use default style (empty string = default)
+    // 2. Use indicatorKey as styleName, add 'reg_' prefix for regional level
+    // GeoServer will use the style if it exists, otherwise use default style
+    const styleName = currentLevel === 'regional' ? `reg_${indicatorKey}` : indicatorKey;
 
     // 3. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
+    // Always pass STYLES parameter - GeoServer will use default style if style doesn't exist
     const wmsParams = {
         'LAYERS': fullLayerName,
         'TILED': false, // Changed to false for debugging
         'VERSION': '1.1.0',
         'FORMAT': 'image/png',
         'TRANSPARENT': true,
-        'SRS': 'EPSG:5179' // WMS 1.1.0 uses SRS
+        'SRS': 'EPSG:5179', // WMS 1.1.0 uses SRS
+        'STYLES': styleName // Always pass styleName, GeoServer will use default if style doesn't exist
     };
-
-    // Add STYLES parameter if style is specified
-    if (styleName) {
-        wmsParams['STYLES'] = styleName;
-    }
 
     const wmsSource = new ol.source.ImageWMS({
         url: `${GEOSERVER_URL}/wms`,
@@ -625,20 +616,26 @@ function parseSLDRules(sldContent) {
 
 /**
  * Fetch and parse SLD file to get legend information
- * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2')
+ * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2', 'reg_z_area_km2')
  * @returns {Promise<Array>} Promise that resolves to array of rule objects
  */
 async function fetchSLDRules(styleName) {
     try {
-        const response = await fetch(`/static/sld/${styleName}.sld`);
+        // Get layer name based on current level
+        const layerName = LAYER_NAMES[currentLevel];
+        // Fetch SLD from layer-specific folder
+        // Note: styleName already includes 'reg_' prefix for regional level
+        const response = await fetch(`/static/sld/${layerName}/${styleName}.sld`, {
+            cache: 'no-store'  // 캐시 무효화
+        });
         if (!response.ok) {
-            console.error(`Failed to fetch SLD file: ${styleName}.sld`);
+            console.error(`Failed to fetch SLD file: ${layerName}/${styleName}.sld`);
             return [];
         }
         const sldContent = await response.text();
         return parseSLDRules(sldContent);
     } catch (error) {
-        console.error(`Error fetching SLD file ${styleName}.sld:`, error);
+        console.error(`Error fetching SLD file ${LAYER_NAMES[currentLevel]}/${styleName}.sld:`, error);
         return [];
     }
 }
@@ -651,11 +648,6 @@ async function fetchSLDRules(styleName) {
  * @param {string} indicatorKey Current indicator key for title
  */
 async function createLegendForMap(mapId, styleName, indicatorKey) {
-    // Only create legend if style is specified (z_area_km2 or c_area_km2)
-    if (!styleName) {
-        return; // No legend for default style
-    }
-
     const mapWrapper = document.getElementById(`${mapId}-wrapper`);
     if (!mapWrapper) {
         console.warn(`Map wrapper not found: ${mapId}-wrapper`);
@@ -668,10 +660,11 @@ async function createLegendForMap(mapId, styleName, indicatorKey) {
         existingLegend.remove();
     }
 
-    // Fetch and parse SLD rules
+    // Fetch and parse SLD rules from local file
+    // If SLD file doesn't exist, fetchSLDRules will return empty array and no legend will be shown
     const rules = await fetchSLDRules(styleName);
     if (rules.length === 0) {
-        console.warn(`No rules found in SLD for style: ${styleName}`);
+        // No SLD file found for this style, no legend will be displayed (silently fail)
         return;
     }
 
@@ -716,12 +709,9 @@ async function createLegendForMap(mapId, styleName, indicatorKey) {
  * @returns {string} Display name
  */
 function getIndicatorDisplayName(indicatorKey) {
-    // This is a simple mapping - you can expand this based on your needs
-    const displayNames = {
-        'z_area_km2': '기본생활권 면적',
-        'c_area_km2': '핵심생활권 면적'
-    };
-    return displayNames[indicatorKey] || indicatorKey;
+    // Use COLUMN_MAPPING to get display name dynamically
+    const mapping = COLUMN_MAPPING[currentLevel];
+    return mapping && mapping[indicatorKey] ? mapping[indicatorKey] : indicatorKey;
 }
 
 
@@ -755,7 +745,8 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName, indic
         'EPSG:5179',
         {
             'INFO_FORMAT': 'application/json',
-            'FEATURE_COUNT': 1
+            'FEATURE_COUNT': 1,
+            'SRS': 'EPSG:5179' // Request geometry in EPSG:5179
         }
     );
 
@@ -806,73 +797,75 @@ function highlightClickedFeature(map, geometry) {
     // Remove existing highlight
     removeFeatureHighlight(map);
 
-    // Create a vector layer for highlighting
-    const vectorSource = new ol.source.Vector({
-        features: (new ol.format.GeoJSON()).readFeatures({
+    if (!geometry) {
+        return;
+    }
+
+    try {
+        // Create a vector layer for highlighting
+        const geoJSONFormat = new ol.format.GeoJSON();
+
+        // Check if geometry coordinates look like they're already in EPSG:5179
+        // EPSG:5179 coordinates are typically in the range of 900000-1200000 for X and 1500000-2000000 for Y
+        // WGS84 coordinates are typically in the range of 120-130 for longitude and 35-40 for latitude
+        const sampleCoord = geometry.coordinates;
+        let isWGS84 = false;
+
+        if (sampleCoord && sampleCoord.length > 0) {
+            const firstCoord = Array.isArray(sampleCoord[0][0]) ? sampleCoord[0][0] : sampleCoord[0];
+            if (firstCoord && firstCoord.length >= 2) {
+                const lon = firstCoord[0];
+                const lat = firstCoord[1];
+                // If coordinates are in typical WGS84 range (lon: 120-130, lat: 35-40)
+                if (lon >= 100 && lon <= 150 && lat >= 30 && lat <= 45) {
+                    isWGS84 = true;
+                }
+            }
+        }
+
+        // Transform geometry based on detected coordinate system
+        const features = geoJSONFormat.readFeatures({
             type: 'FeatureCollection',
             features: [{
                 type: 'Feature',
                 geometry: geometry
             }]
         }, {
-            featureProjection: 'EPSG:5179'
-        })
-    });
+            dataProjection: isWGS84 ? 'EPSG:4326' : 'EPSG:5179', // Detect coordinate system
+            featureProjection: 'EPSG:5179' // Map projection
+        });
 
-    const vectorLayer = new ol.layer.Vector({
-        source: vectorSource,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88', // Bright green-cyan fluorescent color
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)' // Light green-cyan fill
-            })
-        }),
-        zIndex: 1000
-    });
+        if (!features || features.length === 0) {
+            return;
+        }
 
-    // Add glow effect with multiple stroke layers for fluorescent effect
-    const glowStyle = [
-        // Outer glow (larger, more transparent)
-        new ol.style.Style({
+        const vectorSource = new ol.source.Vector({
+            features: features
+        });
+
+        // Create style with only stroke (outline) - no fill
+        // Use thicker stroke and brighter color for better visibility
+        const highlightStyle = new ol.style.Style({
             stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 200, 0.6)',
-                width: 9,
+                color: '#89FDFD', // Cyan highlight color for outline
+                width: 6, // Increased from 4 to 6 for better visibility
                 lineCap: 'round',
                 lineJoin: 'round'
             })
-        }),
-        // Middle glow
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 150, 0.8)',
-                width: 7,
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        }),
-        // Inner bright stroke
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88',
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)'
-            })
-        })
-    ];
+            // No fill - only outline
+        });
 
-    vectorLayer.setStyle(glowStyle);
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: highlightStyle,
+            zIndex: 10000 // Increased z-index to ensure it's on top
+        });
 
-    map.addLayer(vectorLayer);
-    highlightOverlay = vectorLayer;
+        map.addLayer(vectorLayer);
+        highlightOverlay = vectorLayer;
+    } catch (error) {
+        console.error('Error creating highlight:', error);
+    }
 }
 
 /**
@@ -1112,16 +1105,10 @@ function visualizeMap() {
     const newMap = createSingleMap(mapId, currentIndicator, null);
     activeMaps.push(newMap);
 
-    // Create legend for map if style is available
-    let styleName = '';
-    if (currentIndicator === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (currentIndicator === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
-    if (styleName) {
-        createLegendForMap(mapId, styleName, currentIndicator);
-    }
+    // Create legend for map (will try to fetch SLD from local file, if not found, no legend will be shown)
+    // Add 'reg_' prefix for regional level
+    const styleNameForLegend = currentLevel === 'regional' ? `reg_${currentIndicator}` : currentIndicator;
+    createLegendForMap(mapId, styleNameForLegend, currentIndicator);
 
     // Initialize radar chart
     setTimeout(async () => {
@@ -1163,17 +1150,16 @@ async function updateMapIndicator() {
     // Update map title
     $('.map-title-overlay').text(`${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})`);
 
-    // Determine style based on indicatorKey (move outside of wmsLayer check)
-    let styleName = '';
-    if (currentIndicator === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (currentIndicator === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
+    // Use currentIndicator as styleName, add 'reg_' prefix for regional level
+    const styleName = currentLevel === 'regional' ? `reg_${currentIndicator}` : currentIndicator;
 
     // Update map indicator key
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
+
+        // Remove feature highlight when switching maps
+        removeFeatureHighlight(map);
+
         map.set('indicatorKey', currentIndicator);
 
         // Update WMS layer params to reflect new indicator
@@ -1181,31 +1167,15 @@ async function updateMapIndicator() {
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
         if (wmsLayer) {
-            // Update STYLES parameter
-            const updateParams = {};
-            if (styleName) {
-                updateParams['STYLES'] = styleName;
-            } else {
-                // Remove STYLES parameter for default style
-                updateParams['STYLES'] = '';
-            }
-            wmsLayer.getSource().updateParams(updateParams);
+            // Always update STYLES parameter - GeoServer will use default style if style doesn't exist
+            wmsLayer.getSource().updateParams({
+                'STYLES': styleName
+            });
         }
 
-        // Update legend
+        // Update legend (will try to fetch SLD from local file, if not found, existing legend will be removed)
         const mapId = 'map-1';
-        if (styleName) {
-            await createLegendForMap(mapId, styleName, currentIndicator);
-        } else {
-            // Remove legend if no style
-            const mapWrapper = document.getElementById(`${mapId}-wrapper`);
-            if (mapWrapper) {
-                const existingLegend = mapWrapper.querySelector('.map-legend');
-                if (existingLegend) {
-                    existingLegend.remove();
-                }
-            }
-        }
+        await createLegendForMap(mapId, styleName, currentIndicator);
     }
 
     // Update navigation arrows
@@ -1806,26 +1776,9 @@ function hideAttributePopup() {
 // --- MODAL FUNCTIONS ---
 
 /**
- * Open the intent modal
+ * Intent modal functions are now handled by intent-modal.js
+ * These functions are kept for backward compatibility but are no longer used
  */
-function openIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.removeClass('hidden');
-    setTimeout(() => {
-        $modal.find('> div').css('transform', 'scale(100%)');
-    }, 10);
-}
-
-/**
- * Close the intent modal
- */
-function closeIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.find('> div').css('transform', 'scale(95%)');
-    setTimeout(() => {
-        $modal.addClass('hidden');
-    }, 300);
-}
 
 // --- INITIALIZATION ---
 $(document).ready(function () {
@@ -1852,15 +1805,6 @@ $(document).ready(function () {
         visualizeMap();
     }, 500);
 
-    // 4. Initialize Intent Modal handlers
-    $('#intent-modal-btn').on('click', openIntentModal);
-    $('#intent-modal-close').on('click', closeIntentModal);
-
-    // Close modal when clicking outside
-    $('#intent-modal').on('click', function (e) {
-        if (e.target === this) {
-            closeIntentModal();
-        }
-    });
+    // 4. Intent Modal is now handled by intent-modal.js (loaded before this file)
 });
 

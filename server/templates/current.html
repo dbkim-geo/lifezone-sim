@@ -37,21 +37,7 @@
         </div>
     </header>
 
-    <!-- 기획 의도 모달 -->
-    <div id="intent-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center hidden" style="z-index: 9999;">
-        <div class="bg-white/95 backdrop-blur-lg border border-sky-200 rounded-lg shadow-2xl shadow-sky-100 w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-300">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-2xl font-bold bg-gradient-to-r from-sky-500 to-blue-500 bg-clip-text text-transparent">기획 의도</h3>
-                    <button id="intent-modal-close" class="text-gray-500 hover:text-sky-500 text-2xl font-bold transition-colors duration-200">&times;</button>
-                </div>
-                <div class="text-gray-700">
-                    <p class="mb-4">기획 의도 내용이 여기에 표시됩니다.</p>
-                    <!-- 추후 상세 내용 추가 예정 -->
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- 기획 의도 모달은 intent-modal.js에서 동적으로 생성됩니다 -->
 
     <!-- Main Content Area: Use custom class for height calculation -->
     <main class="full-height-flex flex flex-col lg:flex-row p-4 space-y-4 lg:space-y-0 lg:space-x-4">
@@ -101,6 +87,8 @@
     </main>
 
     <!-- Custom JavaScript -->
+    <!-- 기획의도 모달 (공통 모듈) -->
+    <script src="/static/js/intent-modal.js"></script>
     <script src="/static/js/current.js"></script>
 
 </body>

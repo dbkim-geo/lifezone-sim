@@ -214,7 +214,8 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
         'EPSG:5179',
         {
             'INFO_FORMAT': 'application/json',
-            'FEATURE_COUNT': 1
+            'FEATURE_COUNT': 1,
+            'SRS': 'EPSG:5179' // Request geometry in EPSG:5179
         }
     );
 
@@ -254,69 +255,78 @@ let highlightOverlay = null;
  * @param {Object} geometry Feature geometry from GeoJSON
  */
 function highlightClickedFeature(map, geometry) {
+    // Remove existing highlight
     removeFeatureHighlight(map);
 
-    const vectorSource = new ol.source.Vector({
-        features: (new ol.format.GeoJSON()).readFeatures({
+    if (!geometry) {
+        return;
+    }
+
+    try {
+        // Create a vector layer for highlighting
+        const geoJSONFormat = new ol.format.GeoJSON();
+
+        // Check if geometry coordinates look like they're already in EPSG:5179
+        // EPSG:5179 coordinates are typically in the range of 900000-1200000 for X and 1500000-2000000 for Y
+        // WGS84 coordinates are typically in the range of 120-130 for longitude and 35-40 for latitude
+        const sampleCoord = geometry.coordinates;
+        let isWGS84 = false;
+
+        if (sampleCoord && sampleCoord.length > 0) {
+            const firstCoord = Array.isArray(sampleCoord[0][0]) ? sampleCoord[0][0] : sampleCoord[0];
+            if (firstCoord && firstCoord.length >= 2) {
+                const lon = firstCoord[0];
+                const lat = firstCoord[1];
+                // If coordinates are in typical WGS84 range (lon: 120-130, lat: 35-40)
+                if (lon >= 100 && lon <= 150 && lat >= 30 && lat <= 45) {
+                    isWGS84 = true;
+                }
+            }
+        }
+
+        // Transform geometry based on detected coordinate system
+        const features = geoJSONFormat.readFeatures({
             type: 'FeatureCollection',
             features: [{
                 type: 'Feature',
                 geometry: geometry
             }]
         }, {
-            featureProjection: 'EPSG:5179'
-        })
-    });
+            dataProjection: isWGS84 ? 'EPSG:4326' : 'EPSG:5179', // Detect coordinate system
+            featureProjection: 'EPSG:5179' // Map projection
+        });
 
-    const vectorLayer = new ol.layer.Vector({
-        source: vectorSource,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88',
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)'
-            })
-        }),
-        zIndex: 1000
-    });
+        if (!features || features.length === 0) {
+            return;
+        }
 
-    const glowStyle = [
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 200, 0.6)',
-                width: 9,
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        }),
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 150, 0.8)',
-                width: 7,
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        }),
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88',
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)'
-            })
-        })
-    ];
+        const vectorSource = new ol.source.Vector({
+            features: features
+        });
 
-    vectorLayer.setStyle(glowStyle);
-    map.addLayer(vectorLayer);
-    highlightOverlay = vectorLayer;
+        // Create style with only stroke (outline) - no fill
+        // Use thicker stroke and brighter color for better visibility
+        const highlightStyle = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: '#89FDFD', // Cyan highlight color for outline
+                width: 6, // Increased from 4 to 6 for better visibility
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+            // No fill - only outline
+        });
+
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: highlightStyle,
+            zIndex: 10000 // Increased z-index to ensure it's on top
+        });
+
+        map.addLayer(vectorLayer);
+        highlightOverlay = vectorLayer;
+    } catch (error) {
+        console.error('Error creating highlight:', error);
+    }
 }
 
 /**
@@ -569,6 +579,10 @@ async function updateMapScenario() {
     // Update WMS layer
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
+        
+        // Remove feature highlight when switching maps
+        removeFeatureHighlight(map);
+        
         const wmsLayer = map.getLayers().getArray().find(layer =>
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
@@ -1210,26 +1224,9 @@ function hideAttributePopup() {
 // --- MODAL FUNCTIONS ---
 
 /**
- * Open the intent modal
+ * Intent modal functions are now handled by intent-modal.js
+ * These functions are kept for backward compatibility but are no longer used
  */
-function openIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.removeClass('hidden');
-    setTimeout(() => {
-        $modal.find('> div').css('transform', 'scale(100%)');
-    }, 10);
-}
-
-/**
- * Close the intent modal
- */
-function closeIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.find('> div').css('transform', 'scale(95%)');
-    setTimeout(() => {
-        $modal.addClass('hidden');
-    }, 300);
-}
 
 // --- INITIALIZATION ---
 $(document).ready(function () {
@@ -1294,15 +1291,6 @@ $(document).ready(function () {
     // 7. 비교하기 버튼
     $('#compare-button').on('click', toggleCompareMode);
 
-    // 8. Initialize Intent Modal handlers
-    $('#intent-modal-btn').on('click', openIntentModal);
-    $('#intent-modal-close').on('click', closeIntentModal);
-
-    // Close modal when clicking outside
-    $('#intent-modal').on('click', function (e) {
-        if (e.target === this) {
-            closeIntentModal();
-        }
-    });
+    // 8. Intent Modal is now handled by intent-modal.js (loaded before this file)
 });
 
