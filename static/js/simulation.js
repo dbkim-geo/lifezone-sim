@@ -1210,26 +1210,9 @@ function hideAttributePopup() {
 // --- MODAL FUNCTIONS ---
 
 /**
- * Open the intent modal
+ * Intent modal functions are now handled by intent-modal.js
+ * These functions are kept for backward compatibility but are no longer used
  */
-function openIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.removeClass('hidden');
-    setTimeout(() => {
-        $modal.find('> div').css('transform', 'scale(100%)');
-    }, 10);
-}
-
-/**
- * Close the intent modal
- */
-function closeIntentModal() {
-    const $modal = $('#intent-modal');
-    $modal.find('> div').css('transform', 'scale(95%)');
-    setTimeout(() => {
-        $modal.addClass('hidden');
-    }, 300);
-}
 
 // --- INITIALIZATION ---
 $(document).ready(function () {
@@ -1294,15 +1277,6 @@ $(document).ready(function () {
     // 7. 비교하기 버튼
     $('#compare-button').on('click', toggleCompareMode);
 
-    // 8. Initialize Intent Modal handlers
-    $('#intent-modal-btn').on('click', openIntentModal);
-    $('#intent-modal-close').on('click', closeIntentModal);
-
-    // Close modal when clicking outside
-    $('#intent-modal').on('click', function (e) {
-        if (e.target === this) {
-            closeIntentModal();
-        }
-    });
+    // 8. Intent Modal is now handled by intent-modal.js (loaded before this file)
 });
 

@@ -9,170 +9,179 @@
   <NamedLayer>
     <Name>lifesim:current_basic_living_zone</Name>
     <UserStyle>
-      <Name>z_area_km2</Name>
-      <Title>Current Basic Living Zone - z_area_km2 Classification</Title>
-      <Abstract>5-class choropleth map based on z_area_km2 (0-400 km2)</Abstract>
+      <Name>agr_fac_z_cnt_23</Name>
+      <Title>Current Basic Living Zone - agr_fac_z_cnt_23 Classification</Title>
+      <Abstract>5-class choropleth map based on agr_fac_z_cnt_23 (count)</Abstract>
 
       <FeatureTypeStyle>
 
-        <!-- Class 1: 0 - 80 -->
+        <!-- Class 1: 1 - 1.2 -->
         <Rule>
-          <Title>0 - 80 km2</Title>
+          <Title>1 - 1.2</Title>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsGreaterThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>0</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1</ogc:Literal>
               </ogc:PropertyIsGreaterThanOrEqualTo>
               <ogc:PropertyIsLessThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>80</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.2</ogc:Literal>
               </ogc:PropertyIsLessThanOrEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
-              <CssParameter name="fill">#e3f2fd</CssParameter>
-              <CssParameter name="fill-opacity">0.8</CssParameter>
+              <!-- very light cream -->
+              <CssParameter name="fill">#f9f1e4</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
             </Fill>
             <Stroke>
-              <CssParameter name="stroke">#1976d2</CssParameter>
+              <CssParameter name="stroke">#8d6e63</CssParameter>
               <CssParameter name="stroke-width">1</CssParameter>
-              <CssParameter name="stroke-opacity">0.7</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
 
-        <!-- Class 2: 80 - 160 -->
+        <!-- Class 2: 1.2 - 1.4 -->
         <Rule>
-          <Title>80 - 160 km2</Title>
+          <Title>1.2 - 1.4</Title>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsGreaterThan>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>80</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.2</ogc:Literal>
               </ogc:PropertyIsGreaterThan>
               <ogc:PropertyIsLessThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>160</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.4</ogc:Literal>
               </ogc:PropertyIsLessThanOrEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
-              <CssParameter name="fill">#90caf9</CssParameter>
-              <CssParameter name="fill-opacity">0.8</CssParameter>
+              <!-- beige -->
+              <CssParameter name="fill">#f1cfa3</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
             </Fill>
             <Stroke>
-              <CssParameter name="stroke">#1976d2</CssParameter>
+              <CssParameter name="stroke">#8d6e63</CssParameter>
               <CssParameter name="stroke-width">1</CssParameter>
-              <CssParameter name="stroke-opacity">0.7</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
 
-        <!-- Class 3: 160 - 240 -->
+        <!-- Class 3: 1.4 - 1.6 -->
         <Rule>
-          <Title>160 - 240 km2</Title>
+          <Title>1.4 - 1.6</Title>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsGreaterThan>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>160</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.4</ogc:Literal>
               </ogc:PropertyIsGreaterThan>
               <ogc:PropertyIsLessThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>240</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.6</ogc:Literal>
               </ogc:PropertyIsLessThanOrEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
-              <CssParameter name="fill">#ffeb3b</CssParameter>
-              <CssParameter name="fill-opacity">0.8</CssParameter>
+              <!-- orange -->
+              <CssParameter name="fill">#e68a3a</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
             </Fill>
             <Stroke>
-              <CssParameter name="stroke">#f57f17</CssParameter>
+              <CssParameter name="stroke">#6d4c41</CssParameter>
               <CssParameter name="stroke-width">1</CssParameter>
-              <CssParameter name="stroke-opacity">0.7</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
 
-        <!-- Class 4: 240 - 320 -->
+        <!-- Class 4: 1.6 - 1.8 -->
         <Rule>
-          <Title>240 - 320 km2</Title>
+          <Title>1.6 - 1.8</Title>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsGreaterThan>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>240</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.6</ogc:Literal>
               </ogc:PropertyIsGreaterThan>
               <ogc:PropertyIsLessThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>320</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.8</ogc:Literal>
               </ogc:PropertyIsLessThanOrEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
-              <CssParameter name="fill">#ff9800</CssParameter>
-              <CssParameter name="fill-opacity">0.8</CssParameter>
+              <!-- deep orange -->
+              <CssParameter name="fill">#c85a17</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
             </Fill>
             <Stroke>
-              <CssParameter name="stroke">#e65100</CssParameter>
+              <CssParameter name="stroke">#5d4037</CssParameter>
               <CssParameter name="stroke-width">1</CssParameter>
-              <CssParameter name="stroke-opacity">0.7</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
 
-        <!-- Class 5: 320 - 400 -->
+        <!-- Class 5: 1.8 - 2 -->
         <Rule>
-          <Title>320 - 400 km2</Title>
+          <Title>1.8 - 2</Title>
           <ogc:Filter>
             <ogc:And>
               <ogc:PropertyIsGreaterThan>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>320</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1.8</ogc:Literal>
               </ogc:PropertyIsGreaterThan>
               <ogc:PropertyIsLessThanOrEqualTo>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>400</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>2</ogc:Literal>
               </ogc:PropertyIsLessThanOrEqualTo>
             </ogc:And>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
-              <CssParameter name="fill">#d32f2f</CssParameter>
-              <CssParameter name="fill-opacity">0.8</CssParameter>
+              <!-- strong brown -->
+              <CssParameter name="fill">#8b3e02</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
             </Fill>
             <Stroke>
-              <CssParameter name="stroke">#b71c1c</CssParameter>
+              <CssParameter name="stroke">#4e342e</CssParameter>
               <CssParameter name="stroke-width">1</CssParameter>
-              <CssParameter name="stroke-opacity">0.7</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
             </Stroke>
           </PolygonSymbolizer>
         </Rule>
 
-        <!-- No Data: NULL or out of range values -->
+        <!-- No Data / Out of range -->
         <Rule>
           <Title>No Data</Title>
           <ogc:Filter>
             <ogc:Or>
               <ogc:PropertyIsNull>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
               </ogc:PropertyIsNull>
+              <ogc:PropertyIsLessThan>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>1</ogc:Literal>
+              </ogc:PropertyIsLessThan>
               <ogc:PropertyIsGreaterThan>
-                <ogc:PropertyName>z_area_km2</ogc:PropertyName>
-                <ogc:Literal>400</ogc:Literal>
+                <ogc:PropertyName>agr_fac_z_cnt_23</ogc:PropertyName>
+                <ogc:Literal>2</ogc:Literal>
               </ogc:PropertyIsGreaterThan>
             </ogc:Or>
           </ogc:Filter>
           <PolygonSymbolizer>
             <Fill>
               <CssParameter name="fill">#e0e0e0</CssParameter>
-              <CssParameter name="fill-opacity">0.5</CssParameter>
+              <CssParameter name="fill-opacity">0.45</CssParameter>
             </Fill>
             <Stroke>
               <CssParameter name="stroke">#9e9e9e</CssParameter>
@@ -187,4 +196,3 @@
     </UserStyle>
   </NamedLayer>
 </StyledLayerDescriptor>
-
