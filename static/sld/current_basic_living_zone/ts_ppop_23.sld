@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<StyledLayerDescriptor version="1.0.0"
+  xmlns="http://www.opengis.net/sld"
+  xmlns:ogc="http://www.opengis.net/ogc"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd">
+
+  <NamedLayer>
+    <Name>lifesim:current_basic_living_zone</Name>
+    <UserStyle>
+      <Name>ts_ppop_23</Name>
+      <Title>Current Basic Living Zone - ts_ppop_23 Classification</Title>
+      <Abstract>5-class choropleth map based on ts_ppop_23 (persons)</Abstract>
+
+      <FeatureTypeStyle>
+
+        <!-- Class 1: 1912 - 24259 -->
+        <Rule>
+          <Title>1912 - 24259</Title>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsGreaterThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>1912</ogc:Literal>
+              </ogc:PropertyIsGreaterThanOrEqualTo>
+              <ogc:PropertyIsLessThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>24259</ogc:Literal>
+              </ogc:PropertyIsLessThanOrEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#f9f1e4</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#8d6e63</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+        <!-- Class 2: 24259 - 46606 -->
+        <Rule>
+          <Title>24259 - 46606</Title>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsGreaterThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>24259</ogc:Literal>
+              </ogc:PropertyIsGreaterThan>
+              <ogc:PropertyIsLessThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>46606</ogc:Literal>
+              </ogc:PropertyIsLessThanOrEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#f1cfa3</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#8d6e63</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+        <!-- Class 3: 46606 - 68952 -->
+        <Rule>
+          <Title>46606 - 68952</Title>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsGreaterThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>46606</ogc:Literal>
+              </ogc:PropertyIsGreaterThan>
+              <ogc:PropertyIsLessThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>68952</ogc:Literal>
+              </ogc:PropertyIsLessThanOrEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#e68a3a</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#6d4c41</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+        <!-- Class 4: 68952 - 91299 -->
+        <Rule>
+          <Title>68952 - 91299</Title>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsGreaterThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>68952</ogc:Literal>
+              </ogc:PropertyIsGreaterThan>
+              <ogc:PropertyIsLessThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>91299</ogc:Literal>
+              </ogc:PropertyIsLessThanOrEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#c85a17</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#5d4037</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+        <!-- Class 5: 91299 - 113646 -->
+        <Rule>
+          <Title>91299 - 113646</Title>
+          <ogc:Filter>
+            <ogc:And>
+              <ogc:PropertyIsGreaterThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>91299</ogc:Literal>
+              </ogc:PropertyIsGreaterThan>
+              <ogc:PropertyIsLessThanOrEqualTo>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>113646</ogc:Literal>
+              </ogc:PropertyIsLessThanOrEqualTo>
+            </ogc:And>
+          </ogc:Filter>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#8b3e02</CssParameter>
+              <CssParameter name="fill-opacity">0.85</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#4e342e</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.6</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+        <!-- No Data / Out of range -->
+        <Rule>
+          <Title>No Data</Title>
+          <ogc:Filter>
+            <ogc:Or>
+              <ogc:PropertyIsNull>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+              </ogc:PropertyIsNull>
+              <ogc:PropertyIsLessThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>1912</ogc:Literal>
+              </ogc:PropertyIsLessThan>
+              <ogc:PropertyIsGreaterThan>
+                <ogc:PropertyName>ts_ppop_23</ogc:PropertyName>
+                <ogc:Literal>113646</ogc:Literal>
+              </ogc:PropertyIsGreaterThan>
+            </ogc:Or>
+          </ogc:Filter>
+
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">#e0e0e0</CssParameter>
+              <CssParameter name="fill-opacity">0.45</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">#9e9e9e</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+              <CssParameter name="stroke-opacity">0.5</CssParameter>
+              <CssParameter name="stroke-dasharray">4 4</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>

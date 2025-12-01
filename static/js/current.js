@@ -85,8 +85,8 @@ const UNIT_MAPPING = {
         'nc_60m_pt_acc_ratio_23': '%',
         // 생활편리성
         'within_food_med_trip_ratio_23': '%',
-        '90m_rd_add_hg_fac_type_cnt_23': '개',
-        '90m_pt_add_hg_fac_type_cnt_23': '개',
+        'r90m_rd_add_hg_fac_type_cnt_23': '개',
+        'r90m_pt_add_hg_fac_type_cnt_23': '개',
         'rd_over_1h_pop_ratio_23': '%',
         'pt_over_1h_pop_ratio_23': '%'
     }
@@ -174,8 +174,8 @@ const COLUMN_MAPPING = {
         'nc_60m_pt_acc_ratio_23': '중심지-주변 연결성(대중교통)',
         // 생활편리성 (5개)
         'within_food_med_trip_ratio_23': '서비스 이용 자족성',
-        '90m_rd_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(도로이동)',
-        '90m_pt_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(대중교통)',
+        'r90m_rd_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(도로이동)',
+        'r90m_pt_add_hg_fac_type_cnt_23': '중심지 간 기능 보완성(대중교통)',
         'rd_over_1h_pop_ratio_23': '중심지 접근 형평성(도로이동)',
         'pt_over_1h_pop_ratio_23': '중심지 접근 형평성(대중교통)'
     }
@@ -228,7 +228,7 @@ const MOCK_DATA = {
                 'c_90m_pt_acc_cnt_23', 'nc_60m_rd_acc_ratio_23', 'nc_60m_pt_acc_ratio_23'
             ],
             "생활편리성": [
-                'within_food_med_trip_ratio_23', '90m_rd_add_hg_fac_type_cnt_23', '90m_pt_add_hg_fac_type_cnt_23',
+                'within_food_med_trip_ratio_23', 'r90m_rd_add_hg_fac_type_cnt_23', 'r90m_pt_add_hg_fac_type_cnt_23',
                 'rd_over_1h_pop_ratio_23', 'pt_over_1h_pop_ratio_23'
             ]
         },
@@ -448,9 +448,9 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    // 2. Use indicatorKey as styleName directly
+    // 2. Use indicatorKey as styleName, add 'reg_' prefix for regional level
     // GeoServer will use the style if it exists, otherwise use default style
-    const styleName = indicatorKey;
+    const styleName = currentLevel === 'regional' ? `reg_${indicatorKey}` : indicatorKey;
 
     // 3. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
@@ -616,20 +616,26 @@ function parseSLDRules(sldContent) {
 
 /**
  * Fetch and parse SLD file to get legend information
- * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2')
+ * @param {string} styleName Style name (e.g., 'z_area_km2', 'c_area_km2', 'reg_z_area_km2')
  * @returns {Promise<Array>} Promise that resolves to array of rule objects
  */
 async function fetchSLDRules(styleName) {
     try {
-        const response = await fetch(`/static/sld/${styleName}.sld`);
+        // Get layer name based on current level
+        const layerName = LAYER_NAMES[currentLevel];
+        // Fetch SLD from layer-specific folder
+        // Note: styleName already includes 'reg_' prefix for regional level
+        const response = await fetch(`/static/sld/${layerName}/${styleName}.sld`, {
+            cache: 'no-store'  // 캐시 무효화
+        });
         if (!response.ok) {
-            console.error(`Failed to fetch SLD file: ${styleName}.sld`);
+            console.error(`Failed to fetch SLD file: ${layerName}/${styleName}.sld`);
             return [];
         }
         const sldContent = await response.text();
         return parseSLDRules(sldContent);
     } catch (error) {
-        console.error(`Error fetching SLD file ${styleName}.sld:`, error);
+        console.error(`Error fetching SLD file ${LAYER_NAMES[currentLevel]}/${styleName}.sld:`, error);
         return [];
     }
 }
@@ -1097,7 +1103,9 @@ function visualizeMap() {
     activeMaps.push(newMap);
 
     // Create legend for map (will try to fetch SLD from local file, if not found, no legend will be shown)
-    createLegendForMap(mapId, currentIndicator, currentIndicator);
+    // Add 'reg_' prefix for regional level
+    const styleNameForLegend = currentLevel === 'regional' ? `reg_${currentIndicator}` : currentIndicator;
+    createLegendForMap(mapId, styleNameForLegend, currentIndicator);
 
     // Initialize radar chart
     setTimeout(async () => {
@@ -1139,8 +1147,8 @@ async function updateMapIndicator() {
     // Update map title
     $('.map-title-overlay').text(`${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})`);
 
-    // Use currentIndicator as styleName directly
-    const styleName = currentIndicator;
+    // Use currentIndicator as styleName, add 'reg_' prefix for regional level
+    const styleName = currentLevel === 'regional' ? `reg_${currentIndicator}` : currentIndicator;
 
     // Update map indicator key
     if (activeMaps.length > 0) {
