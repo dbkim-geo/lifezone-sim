@@ -579,6 +579,10 @@ async function updateMapScenario() {
     // Update WMS layer
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
+        
+        // Remove feature highlight when switching maps
+        removeFeatureHighlight(map);
+        
         const wmsLayer = map.getLayers().getArray().find(layer =>
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );

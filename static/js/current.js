@@ -1156,6 +1156,10 @@ async function updateMapIndicator() {
     // Update map indicator key
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
+
+        // Remove feature highlight when switching maps
+        removeFeatureHighlight(map);
+
         map.set('indicatorKey', currentIndicator);
 
         // Update WMS layer params to reflect new indicator
