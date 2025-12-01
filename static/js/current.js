@@ -448,31 +448,22 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
     const layerName = LAYER_NAMES[currentLevel];
     const fullLayerName = `${GEOSERVER_WORKSPACE}:${layerName}`;
 
-    // 2. Determine style based on indicatorKey
-    // If indicatorKey matches z_area_km2 or c_area_km2, use corresponding style
-    let styleName = '';
-    if (indicatorKey === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (indicatorKey === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
-    // For other indicators, use default style (empty string = default)
+    // 2. Use indicatorKey as styleName directly
+    // GeoServer will use the style if it exists, otherwise use default style
+    const styleName = indicatorKey;
 
     // 3. Create WMS Image Layer with EPSG:5179
     // Note: WMS 1.1.0 uses SRS, WMS 1.3.0 uses CRS
+    // Always pass STYLES parameter - GeoServer will use default style if style doesn't exist
     const wmsParams = {
         'LAYERS': fullLayerName,
         'TILED': false, // Changed to false for debugging
         'VERSION': '1.1.0',
         'FORMAT': 'image/png',
         'TRANSPARENT': true,
-        'SRS': 'EPSG:5179' // WMS 1.1.0 uses SRS
+        'SRS': 'EPSG:5179', // WMS 1.1.0 uses SRS
+        'STYLES': styleName // Always pass styleName, GeoServer will use default if style doesn't exist
     };
-
-    // Add STYLES parameter if style is specified
-    if (styleName) {
-        wmsParams['STYLES'] = styleName;
-    }
 
     const wmsSource = new ol.source.ImageWMS({
         url: `${GEOSERVER_URL}/wms`,
@@ -651,11 +642,6 @@ async function fetchSLDRules(styleName) {
  * @param {string} indicatorKey Current indicator key for title
  */
 async function createLegendForMap(mapId, styleName, indicatorKey) {
-    // Only create legend if style is specified (z_area_km2 or c_area_km2)
-    if (!styleName) {
-        return; // No legend for default style
-    }
-
     const mapWrapper = document.getElementById(`${mapId}-wrapper`);
     if (!mapWrapper) {
         console.warn(`Map wrapper not found: ${mapId}-wrapper`);
@@ -668,10 +654,11 @@ async function createLegendForMap(mapId, styleName, indicatorKey) {
         existingLegend.remove();
     }
 
-    // Fetch and parse SLD rules
+    // Fetch and parse SLD rules from local file
+    // If SLD file doesn't exist, fetchSLDRules will return empty array and no legend will be shown
     const rules = await fetchSLDRules(styleName);
     if (rules.length === 0) {
-        console.warn(`No rules found in SLD for style: ${styleName}`);
+        // No SLD file found for this style, no legend will be displayed (silently fail)
         return;
     }
 
@@ -716,12 +703,9 @@ async function createLegendForMap(mapId, styleName, indicatorKey) {
  * @returns {string} Display name
  */
 function getIndicatorDisplayName(indicatorKey) {
-    // This is a simple mapping - you can expand this based on your needs
-    const displayNames = {
-        'z_area_km2': '기본생활권 면적',
-        'c_area_km2': '핵심생활권 면적'
-    };
-    return displayNames[indicatorKey] || indicatorKey;
+    // Use COLUMN_MAPPING to get display name dynamically
+    const mapping = COLUMN_MAPPING[currentLevel];
+    return mapping && mapping[indicatorKey] ? mapping[indicatorKey] : indicatorKey;
 }
 
 
@@ -1112,16 +1096,8 @@ function visualizeMap() {
     const newMap = createSingleMap(mapId, currentIndicator, null);
     activeMaps.push(newMap);
 
-    // Create legend for map if style is available
-    let styleName = '';
-    if (currentIndicator === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (currentIndicator === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
-    if (styleName) {
-        createLegendForMap(mapId, styleName, currentIndicator);
-    }
+    // Create legend for map (will try to fetch SLD from local file, if not found, no legend will be shown)
+    createLegendForMap(mapId, currentIndicator, currentIndicator);
 
     // Initialize radar chart
     setTimeout(async () => {
@@ -1163,13 +1139,8 @@ async function updateMapIndicator() {
     // Update map title
     $('.map-title-overlay').text(`${koreanName} (${currentIndicatorIndex + 1}/${selectedIndicators.length})`);
 
-    // Determine style based on indicatorKey (move outside of wmsLayer check)
-    let styleName = '';
-    if (currentIndicator === 'z_area_km2') {
-        styleName = 'z_area_km2';
-    } else if (currentIndicator === 'c_area_km2') {
-        styleName = 'c_area_km2';
-    }
+    // Use currentIndicator as styleName directly
+    const styleName = currentIndicator;
 
     // Update map indicator key
     if (activeMaps.length > 0) {
@@ -1181,31 +1152,15 @@ async function updateMapIndicator() {
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
         if (wmsLayer) {
-            // Update STYLES parameter
-            const updateParams = {};
-            if (styleName) {
-                updateParams['STYLES'] = styleName;
-            } else {
-                // Remove STYLES parameter for default style
-                updateParams['STYLES'] = '';
-            }
-            wmsLayer.getSource().updateParams(updateParams);
+            // Always update STYLES parameter - GeoServer will use default style if style doesn't exist
+            wmsLayer.getSource().updateParams({
+                'STYLES': styleName
+            });
         }
 
-        // Update legend
+        // Update legend (will try to fetch SLD from local file, if not found, existing legend will be removed)
         const mapId = 'map-1';
-        if (styleName) {
-            await createLegendForMap(mapId, styleName, currentIndicator);
-        } else {
-            // Remove legend if no style
-            const mapWrapper = document.getElementById(`${mapId}-wrapper`);
-            if (mapWrapper) {
-                const existingLegend = mapWrapper.querySelector('.map-legend');
-                if (existingLegend) {
-                    existingLegend.remove();
-                }
-            }
-        }
+        await createLegendForMap(mapId, styleName, currentIndicator);
     }
 
     // Update navigation arrows
