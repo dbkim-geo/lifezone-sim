@@ -214,7 +214,8 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
         'EPSG:5179',
         {
             'INFO_FORMAT': 'application/json',
-            'FEATURE_COUNT': 1
+            'FEATURE_COUNT': 1,
+            'SRS': 'EPSG:5179' // Request geometry in EPSG:5179
         }
     );
 
@@ -254,69 +255,78 @@ let highlightOverlay = null;
  * @param {Object} geometry Feature geometry from GeoJSON
  */
 function highlightClickedFeature(map, geometry) {
+    // Remove existing highlight
     removeFeatureHighlight(map);
 
-    const vectorSource = new ol.source.Vector({
-        features: (new ol.format.GeoJSON()).readFeatures({
+    if (!geometry) {
+        return;
+    }
+
+    try {
+        // Create a vector layer for highlighting
+        const geoJSONFormat = new ol.format.GeoJSON();
+
+        // Check if geometry coordinates look like they're already in EPSG:5179
+        // EPSG:5179 coordinates are typically in the range of 900000-1200000 for X and 1500000-2000000 for Y
+        // WGS84 coordinates are typically in the range of 120-130 for longitude and 35-40 for latitude
+        const sampleCoord = geometry.coordinates;
+        let isWGS84 = false;
+
+        if (sampleCoord && sampleCoord.length > 0) {
+            const firstCoord = Array.isArray(sampleCoord[0][0]) ? sampleCoord[0][0] : sampleCoord[0];
+            if (firstCoord && firstCoord.length >= 2) {
+                const lon = firstCoord[0];
+                const lat = firstCoord[1];
+                // If coordinates are in typical WGS84 range (lon: 120-130, lat: 35-40)
+                if (lon >= 100 && lon <= 150 && lat >= 30 && lat <= 45) {
+                    isWGS84 = true;
+                }
+            }
+        }
+
+        // Transform geometry based on detected coordinate system
+        const features = geoJSONFormat.readFeatures({
             type: 'FeatureCollection',
             features: [{
                 type: 'Feature',
                 geometry: geometry
             }]
         }, {
-            featureProjection: 'EPSG:5179'
-        })
-    });
+            dataProjection: isWGS84 ? 'EPSG:4326' : 'EPSG:5179', // Detect coordinate system
+            featureProjection: 'EPSG:5179' // Map projection
+        });
 
-    const vectorLayer = new ol.layer.Vector({
-        source: vectorSource,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88',
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)'
-            })
-        }),
-        zIndex: 1000
-    });
+        if (!features || features.length === 0) {
+            return;
+        }
 
-    const glowStyle = [
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 200, 0.6)',
-                width: 9,
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        }),
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: 'rgba(0, 255, 150, 0.8)',
-                width: 7,
-                lineCap: 'round',
-                lineJoin: 'round'
-            })
-        }),
-        new ol.style.Style({
-            stroke: new ol.style.Stroke({
-                color: '#00ff88',
-                width: 5,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }),
-            fill: new ol.style.Fill({
-                color: 'rgba(0, 255, 136, 0.15)'
-            })
-        })
-    ];
+        const vectorSource = new ol.source.Vector({
+            features: features
+        });
 
-    vectorLayer.setStyle(glowStyle);
-    map.addLayer(vectorLayer);
-    highlightOverlay = vectorLayer;
+        // Create style with only stroke (outline) - no fill
+        // Use thicker stroke and brighter color for better visibility
+        const highlightStyle = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: '#89FDFD', // Cyan highlight color for outline
+                width: 6, // Increased from 4 to 6 for better visibility
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+            // No fill - only outline
+        });
+
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: highlightStyle,
+            zIndex: 10000 // Increased z-index to ensure it's on top
+        });
+
+        map.addLayer(vectorLayer);
+        highlightOverlay = vectorLayer;
+    } catch (error) {
+        console.error('Error creating highlight:', error);
+    }
 }
 
 /**
