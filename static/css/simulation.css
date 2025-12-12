@@ -123,19 +123,16 @@ body {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Population Legend Styling */
+/* Population Legend Styling - 좌측 패널 내부에 배치 */
 .population-legend {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
+    /* absolute positioning 제거, 일반 블록 요소로 변경 */
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(10px);
     border-radius: 8px;
     border: 1px solid rgba(125, 211, 252, 0.4);
     box-shadow: 0 4px 12px rgba(125, 211, 252, 0.2);
-    z-index: 1000;
     padding: 12px;
-    min-width: 180px;
+    width: 100%;
 }
 
 .population-legend.hidden {

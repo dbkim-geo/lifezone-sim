@@ -103,6 +103,46 @@
                     비교하기
                 </button>
             </div>
+
+            <!-- 6. 2040년 1Km 거주 격자 Legend (비교하기 버튼 아래) -->
+            <div id="population-legend" class="population-legend hidden border-t border-sky-200 pt-2 mt-2">
+                <div class="legend-title">2040년 1Km 거주 격자</div>
+                <div class="legend-unit">단위 (명)</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1 - 20</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">20 - 100</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">100 - 200</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">200 - 400</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">400 - 600</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">600 - 1,500</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1,500 - 3,000</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">3,000 - 17,642</span>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- Center Map Area -->
@@ -113,45 +153,6 @@
                 <div id="map-container" class="h-full"> 
                     <div id="map-1-wrapper" class="map-wrapper relative h-full">
                         <div id="map-1" class="map h-full"></div>
-                        <!-- Population Legend (shown when population layer is on) -->
-                        <div id="population-legend" class="population-legend hidden">
-                            <div class="legend-title">2040년 1Km 거주 격자</div>
-                            <div class="legend-unit">단위 (명)</div>
-                            <div class="legend-items">
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">1 - 20</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">20 - 100</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">100 - 200</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">200 - 400</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">400 - 600</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">600 - 1,500</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">1,500 - 3,000</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">3,000 - 17,642</span>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </section>

@@ -141,7 +141,7 @@ function createSingleMap(targetId, layerName, masterView = null) {
     const defaultControls = ol.control.defaults({
         zoom: false  // 줌 컨트롤 제거
     });
-    
+
     const newMap = new ol.Map({
         target: targetId,
         layers: [wmsLayer],
@@ -458,8 +458,14 @@ function visualizeSimulation() {
     const currentScenario = selectedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
-    // Check if population layer should be shown
+    // Check if population layer should be shown and update legend visibility
     const showPopulation = $('#population-2040-toggle').is(':checked');
+    // Update legend visibility based on toggle state
+    if (showPopulation) {
+        $('#population-legend').removeClass('hidden');
+    } else {
+        $('#population-legend').addClass('hidden');
+    }
 
     // Create map HTML with navigation arrows and legend
     const mapHtml = `
@@ -479,45 +485,6 @@ function visualizeSimulation() {
             <div id="${mapId}" class="map h-full">
                 <div class="map-title-overlay" title="${scenarioName}">
                     ${scenarioName} (${currentScenarioIndex + 1}/${selectedLayers.length})
-                </div>
-            </div>
-            <!-- Population Legend (shown when population layer is on) -->
-            <div id="population-legend" class="population-legend ${showPopulation ? '' : 'hidden'}">
-                <div class="legend-title">2040년 1Km 거주 격자</div>
-                <div class="legend-unit">단위 (명)</div>
-                <div class="legend-items">
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">1 - 20</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">20 - 100</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">100 - 200</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">200 - 400</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">400 - 600</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">600 - 1,500</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">1,500 - 3,000</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">3,000 - 17,642</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -585,10 +552,10 @@ async function updateMapScenario() {
     // Update WMS layer
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
-        
+
         // Remove feature highlight when switching maps
         removeFeatureHighlight(map);
-        
+
         const wmsLayer = map.getLayers().getArray().find(layer =>
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
