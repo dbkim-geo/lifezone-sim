@@ -20,7 +20,7 @@
     <!-- Configuration (must be loaded before simulation.js) -->
     <script src="/static/js/config.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/simulation.css">
+    <link rel="stylesheet" href="/static/css/simulation.css?v={{ css_version }}">
 </head>
 <body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
 
@@ -75,33 +75,91 @@
             </div>
 
             <!-- 3. 공간구조목표 시나리오 -->
-            <div class="mb-2 border-t border-sky-200 pt-2">
+            <div class="mb-6 border-t border-sky-200 pt-4">
                 <label class="block text-sm font-medium text-sky-600 mb-1">공간구조목표 시나리오</label>
                 <div class="space-y-2">
                     <button type="button" id="scenario-m1" class="w-full px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-400 text-white font-medium rounded-lg transition-all duration-200 shadow-md shadow-sky-200" data-scenario="m1" disabled>
-                        콤팩트성 확보
+                        콤팩트성 확보 [SN1]
                     </button>
                     <button type="button" id="scenario-m2" class="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 border border-gray-300" data-scenario="m2">
-                        콤팩트성 확보 및 배후 인구규모 확보
+                        콤팩트성 확보 및<br> 배후 인구 규모 확보 [SN2]
                     </button>
                     <button type="button" id="scenario-m3" class="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 border border-gray-300" data-scenario="m3">
-                        콤팩트성 및 네트워크성 동시 확보
+                        콤팩트성 확보 및<br> 네트워크성 동시 확보 [SN3]
                     </button>
                 </div>
             </div>
 
             <!-- 4. 시각화 버튼 -->
-            <div class="mb-2 border-t border-sky-200 pt-2">
-                <button id="simulate-button" class="w-full bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105">
+            <div class="mb-4 border-t border-sky-200 pt-4">
+                <button id="simulate-button" class="w-full bg-gradient-to-r from-sky-400 to-blue-400 hover:from-sky-300 hover:to-blue-300 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md shadow-sky-200 hover:shadow-sky-300 transform hover:scale-105 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                        <defs>
+                            <marker id="Triangle" viewBox="0 0 10 10" refX="1" refY="5" 
+                                    markerUnits="strokeWidth" markerWidth="4" markerHeight="3"
+                                    orient="auto">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+                            </marker>
+                        </defs>
+                        <g fill="none" stroke="currentColor" stroke-width="2.5" marker-end="url(#Triangle)">
+                            <path d="M 8,6 C 12,4 16,4 20,6"/>
+                            <path d="M 20,18 C 16,20 12,20 8,18"/>
+                        </g>
+                    </svg>
                     장래 생활권 시뮬레이션 수행
                 </button>
             </div>
 
-            <!-- 5. 비교하기 버튼 -->
-            <div class="mb-2">
-                <button id="compare-button" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-gray-300">
-                    비교하기
-                </button>
+            <!-- 5. 비교하기 버튼 (토글) -->
+            <div class="mb-2 border-t border-sky-200 pt-4">
+                <label class="block text-sm font-medium text-sky-600 mb-1">비교하기</label>
+                <div class="flex items-center">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="compare-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-400"></div>
+                        <span class="ml-3 text-sm text-gray-700" id="compare-label">Off</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 6. 2040년 1Km 거주 격자 Legend (비교하기 버튼 아래) -->
+            <div id="population-legend" class="population-legend hidden border-t border-sky-200 pt-2 mt-2">
+                <div class="legend-title">2040년 1Km 거주 격자</div>
+                <div class="legend-unit">단위 (명)</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1 - 20</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">20 - 100</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">100 - 200</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">200 - 400</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">400 - 600</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">600 - 1,500</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">1,500 - 3,000</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
+                        <span class="legend-label">3,000 - 17,642</span>
+                    </div>
+                </div>
             </div>
         </aside>
 
@@ -113,45 +171,6 @@
                 <div id="map-container" class="h-full"> 
                     <div id="map-1-wrapper" class="map-wrapper relative h-full">
                         <div id="map-1" class="map h-full"></div>
-                        <!-- Population Legend (shown when population layer is on) -->
-                        <div id="population-legend" class="population-legend hidden">
-                            <div class="legend-title">2040년 1Km 거주 격자</div>
-                            <div class="legend-unit">단위 (명)</div>
-                            <div class="legend-items">
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">1 - 20</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">20 - 100</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">100 - 200</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">200 - 400</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">400 - 600</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">600 - 1,500</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">1,500 - 3,000</span>
-                                </div>
-                                <div class="legend-item">
-                                    <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
-                                    <span class="legend-label">3,000 - 17,642</span>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </section>
@@ -184,7 +203,16 @@
 
     <!-- Custom JavaScript -->
     <!-- 기획의도 모달 (공통 모듈) -->
-    <script src="/static/js/intent-modal.js"></script>
+    <script src="/static/js/intent-modal.js?v={{ js_version }}"></script>
+    <script>
+        // 장래생활권 페이지에서는 장래생활권 탭을 기본으로 표시
+        document.addEventListener('DOMContentLoaded', function() {
+            // 기존 초기화 제거하고 장래생활권 탭으로 재초기화
+            if (typeof initIntentModal === 'function') {
+                initIntentModal('future');
+            }
+        });
+    </script>
     <script src="/static/js/simulation.js"></script>
 
 </body>

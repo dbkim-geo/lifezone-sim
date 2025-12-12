@@ -20,7 +20,7 @@
     <!-- Configuration (must be loaded before current.js) -->
     <script src="/static/js/config.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/current.css">
+    <link rel="stylesheet" href="/static/css/current.css?v={{ css_version }}">
 </head>
 <body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
 
@@ -59,7 +59,7 @@
 
             <!-- 2. 지표 선택 (Dynamic Checkboxes - 2 Column Grid) -->
             <div class="mb-2 border-t border-sky-200 pt-2">
-                <label class="block text-sm font-medium text-sky-600 mb-1">시각화 지표 선택 (최대 4개)</label>
+                <label class="block text-sm font-medium text-sky-600 mb-1">시각화 지표 선택</label>
                 <div id="indicator-selection" class="">
                     <!-- Dynamic Checkboxes will be inserted here -->
                 </div>
@@ -88,7 +88,16 @@
 
     <!-- Custom JavaScript -->
     <!-- 기획의도 모달 (공통 모듈) -->
-    <script src="/static/js/intent-modal.js"></script>
+    <script src="/static/js/intent-modal.js?v={{ js_version }}"></script>
+    <script>
+        // 현재생활권 페이지에서는 현재생활권 탭을 기본으로 표시
+        document.addEventListener('DOMContentLoaded', function() {
+            // 기존 초기화 제거하고 현재생활권 탭으로 재초기화
+            if (typeof initIntentModal === 'function') {
+                initIntentModal('current');
+            }
+        });
+    </script>
     <script src="/static/js/current.js"></script>
 
 </body>

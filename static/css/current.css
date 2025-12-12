@@ -47,11 +47,14 @@ body {
     background: rgba(241, 245, 249, 0.5);
 }
 
-/* Map title overlay styling */
+/* Map title overlay styling - 지도 좌상단 타이틀 박스 위치 조정 */
 .map-title-overlay {
     position: absolute;
+    /* 좌상단 타이틀 박스 위치: top과 left 값을 조정하여 위치 변경 가능 */
     top: 10px;
+    /* 상단에서의 거리 (픽셀 단위) */
     left: 10px;
+    /* 좌측에서의 거리 (픽셀 단위) */
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 6px;
@@ -89,6 +92,24 @@ body {
 
 .radar-chart-overlay canvas {
     flex: 1;
+}
+
+/* 방사형 차트 안내 메시지 */
+.radar-chart-info-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.radar-chart-info-message.hidden {
+    display: none;
 }
 
 /* Map legend styling (same as simulation page) */
@@ -242,8 +263,10 @@ body {
     border-radius: 6px;
     border: 1px solid rgba(203, 213, 225, 0.5);
     transition: all 0.2s ease;
-    white-space: nowrap; /* Prevent text wrapping */
-    min-width: 0; /* Allow flex item to shrink */
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    min-width: 0;
+    /* Allow flex item to shrink */
 }
 
 .attribute-item:hover {
@@ -259,10 +282,12 @@ body {
     font-weight: 500;
     flex: 1;
     margin-right: 8px;
-    white-space: nowrap; /* Prevent text wrapping */
+    white-space: nowrap;
+    /* Prevent text wrapping */
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 0; /* Don't shrink the name */
+    flex-shrink: 0;
+    /* Don't shrink the name */
 }
 
 .attribute-value {
@@ -271,8 +296,10 @@ body {
     font-weight: 600;
     text-align: right;
     min-width: 60px;
-    white-space: nowrap; /* Prevent text wrapping */
-    flex-shrink: 0; /* Don't shrink the value */
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    flex-shrink: 0;
+    /* Don't shrink the value */
     margin-left: 4px;
 }
 

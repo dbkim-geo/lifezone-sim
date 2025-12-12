@@ -1,7 +1,8 @@
 // Global variables for OpenLayers and state management
 let activeMaps = []; // Array to hold all active ol.Map instances
 let currentScenarioIndex = 0; // Current scenario index for navigation
-let selectedScenarios = []; // Array of selected scenario keys
+let selectedScenarios = []; // Array of selected scenario keys (UI selection)
+let simulatedScenarios = []; // Array of scenario keys that have been actually simulated (only these are available for map navigation)
 let isCompareMode = false; // Whether in compare mode (split screen)
 let barCharts = {
     average: null,  // Average chart
@@ -51,9 +52,9 @@ const SCENARIO_ATTRIBUTES = {
 
 // Scenario name mapping
 const SCENARIO_NAMES = {
-    'm1': '콤팩트성 확보',
-    'm2': '콤팩트성 확보 및 배후 인구규모 확보',
-    'm3': '콤팩트성 및 네트워크성 동시 확보'
+    'm1': 'SN1',
+    'm2': 'SN2',
+    'm3': 'SN3'
 };
 
 // --- OPENLAYERS FUNCTIONS ---
@@ -137,10 +138,16 @@ function createSingleMap(targetId, layerName, masterView = null) {
     });
 
     // Create Map Instance
+    // Remove default zoom controls (줌인/아웃 버튼 제거)
+    const defaultControls = ol.control.defaults({
+        zoom: false  // 줌 컨트롤 제거
+    });
+
     const newMap = new ol.Map({
         target: targetId,
         layers: [wmsLayer],
-        view: view
+        view: view,
+        controls: defaultControls
     });
 
     // Add error handling for WMS layer
@@ -196,7 +203,15 @@ function createSingleMap(targetId, layerName, masterView = null) {
  * @param {string} mapId
  * @param {string} layerName Full layer name (workspace:layer)
  */
-async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
+async function handleMapClickWithWMS(event, mapInstance, mapId, fullLayerName) {
+    // Get layer name from map instance
+    const layerName = mapInstance.get('layerName');
+
+    // Don't respond to clicks on current_regional_living_zone
+    if (layerName === 'current_regional_living_zone') {
+        return;
+    }
+
     const viewResolution = mapInstance.getView().getResolution();
     const wmsLayer = mapInstance.getLayers().getArray().find(layer =>
         layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
@@ -204,7 +219,12 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
 
     if (!wmsLayer) {
         hideAttributePopup();
-        removeFeatureHighlight(mapInstance);
+        // In compare mode, only remove from this map; in single mode, remove from all
+        if (isCompareMode) {
+            removeFeatureHighlight(mapInstance);
+        } else {
+            removeFeatureHighlightFromAllMaps();
+        }
         return;
     }
 
@@ -227,35 +247,53 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
                     const feature = data.features[0];
                     const props = feature.properties;
 
-                    // Highlight the clicked feature
-                    highlightClickedFeature(mapInstance, feature.geometry);
+                    // In compare mode: remove highlights from all maps first, then highlight only this map
+                    // In single map mode: just highlight this map
+                    if (isCompareMode) {
+                        removeFeatureHighlightFromAllMaps();
+                    }
 
-                    // Update charts with clicked feature data
+                    // Highlight the clicked feature only on this map (no syncing)
+                    highlightClickedFeature(mapInstance, feature.geometry, false);
+
+                    // Update charts with clicked feature data (only for scenario layers, not current)
                     const regionName = props.nm || props.name || props.지역명 || props.NAME || '지역';
                     await updateChartsWithClickedFeature(regionName, event.coordinate);
                 } else {
-                    removeFeatureHighlight(mapInstance);
+                    removeFeatureHighlightFromAllMaps();
                     resetClickedFeatureFromCharts();
                 }
             })
             .catch(error => {
-                removeFeatureHighlight(mapInstance);
+                // In compare mode, only remove from this map; in single mode, remove from all
+                if (isCompareMode) {
+                    removeFeatureHighlight(mapInstance);
+                } else {
+                    removeFeatureHighlightFromAllMaps();
+                }
             });
     } else {
-        removeFeatureHighlight(mapInstance);
+        // In compare mode, only remove from this map; in single mode, remove from all
+        if (isCompareMode) {
+            removeFeatureHighlight(mapInstance);
+        } else {
+            removeFeatureHighlightFromAllMaps();
+        }
     }
 }
 
 // Global variables for feature highlight
-let highlightOverlay = null;
+// Store highlight overlay for each map (for compare mode)
+let highlightOverlays = {}; // { mapId: vectorLayer }
 
 /**
  * Highlight the clicked feature with an overlay
  * @param {ol.Map} map Map instance
  * @param {Object} geometry Feature geometry from GeoJSON
+ * @param {boolean} syncToAllMaps (deprecated, kept for compatibility but not used)
  */
-function highlightClickedFeature(map, geometry) {
-    // Remove existing highlight
+function highlightClickedFeature(map, geometry, syncToAllMaps = false) {
+    // Remove existing highlight from this map
     removeFeatureHighlight(map);
 
     if (!geometry) {
@@ -323,7 +361,88 @@ function highlightClickedFeature(map, geometry) {
         });
 
         map.addLayer(vectorLayer);
-        highlightOverlay = vectorLayer;
+
+        // Store highlight overlay for this map
+        const mapId = map.getTarget() || 'default';
+        highlightOverlays[mapId] = vectorLayer;
+    } catch (error) {
+        console.error('Error creating highlight:', error);
+    }
+}
+
+/**
+ * Highlight feature on a specific map (internal helper)
+ * @param {ol.Map} map Map instance
+ * @param {Object} geometry Feature geometry from GeoJSON
+ * @param {boolean} storeGeometry Whether to store geometry for syncing
+ */
+function highlightClickedFeatureOnMap(map, geometry, storeGeometry = false) {
+    // Remove existing highlight from this map
+    removeFeatureHighlight(map);
+
+    if (!geometry) {
+        return;
+    }
+
+    try {
+        // Create a vector layer for highlighting
+        const geoJSONFormat = new ol.format.GeoJSON();
+
+        // Check if geometry coordinates look like they're already in EPSG:5179
+        const sampleCoord = geometry.coordinates;
+        let isWGS84 = false;
+
+        if (sampleCoord && sampleCoord.length > 0) {
+            const firstCoord = Array.isArray(sampleCoord[0][0]) ? sampleCoord[0][0] : sampleCoord[0];
+            if (firstCoord && firstCoord.length >= 2) {
+                const lon = firstCoord[0];
+                const lat = firstCoord[1];
+                if (lon >= 100 && lon <= 150 && lat >= 30 && lat <= 45) {
+                    isWGS84 = true;
+                }
+            }
+        }
+
+        // Transform geometry based on detected coordinate system
+        const features = geoJSONFormat.readFeatures({
+            type: 'FeatureCollection',
+            features: [{
+                type: 'Feature',
+                geometry: geometry
+            }]
+        }, {
+            dataProjection: isWGS84 ? 'EPSG:4326' : 'EPSG:5179',
+            featureProjection: 'EPSG:5179'
+        });
+
+        if (!features || features.length === 0) {
+            return;
+        }
+
+        const vectorSource = new ol.source.Vector({
+            features: features
+        });
+
+        const highlightStyle = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: '#89FDFD',
+                width: 6,
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+        });
+
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: highlightStyle,
+            zIndex: 10000
+        });
+
+        map.addLayer(vectorLayer);
+
+        // Store highlight overlay for this map
+        const mapId = map.getTarget() || 'default';
+        highlightOverlays[mapId] = vectorLayer;
     } catch (error) {
         console.error('Error creating highlight:', error);
     }
@@ -334,10 +453,20 @@ function highlightClickedFeature(map, geometry) {
  * @param {ol.Map} map Map instance
  */
 function removeFeatureHighlight(map) {
-    if (highlightOverlay) {
-        map.removeLayer(highlightOverlay);
-        highlightOverlay = null;
+    const mapId = map.getTarget() || 'default';
+    if (highlightOverlays[mapId]) {
+        map.removeLayer(highlightOverlays[mapId]);
+        delete highlightOverlays[mapId];
     }
+}
+
+/**
+ * Remove feature highlight from all maps
+ */
+function removeFeatureHighlightFromAllMaps() {
+    activeMaps.forEach(map => {
+        removeFeatureHighlight(map);
+    });
 }
 
 // --- UI & STATE MANAGEMENT FUNCTIONS ---
@@ -355,6 +484,7 @@ function initializeUI() {
 
     // 공간구조목표 시나리오: 콤팩트성 확보만 선택 (기본값)
     selectedScenarios = ['m1'];
+    simulatedScenarios = []; // No scenarios simulated initially
     updateScenarioButtons();
 }
 
@@ -387,13 +517,15 @@ function updateScenarioButtons() {
 
 /**
  * Get layer names for selected scenarios
+ * @param {boolean} useSimulatedOnly - If true, only return layers for simulated scenarios. If false, return for selected scenarios.
  * @returns {Array} Array of layer names
  */
-function getSelectedLayerNames() {
+function getSelectedLayerNames(useSimulatedOnly = false) {
     const regionalCount = $('#regional-count-select').val();
     const layers = [];
+    const scenariosToUse = useSimulatedOnly ? simulatedScenarios : selectedScenarios;
 
-    selectedScenarios.forEach(scenario => {
+    scenariosToUse.forEach(scenario => {
         if (SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
             layers.push(SCENARIO_LAYERS[scenario][regionalCount]);
         }
@@ -404,10 +536,25 @@ function getSelectedLayerNames() {
 
 /**
  * Visualize simulation
+ * @param {boolean} showLoading - Whether to show loading overlay
+ * @param {boolean} updateSimulatedScenarios - Whether to update simulatedScenarios (only true when simulate button is clicked)
  */
-function visualizeSimulation() {
-    // Show loading overlay
-    $('#loading-overlay').removeClass('hidden');
+function visualizeSimulation(showLoading = true, updateSimulatedScenarios = false) {
+    // Update simulatedScenarios to match selectedScenarios only when simulate button is clicked
+    if (updateSimulatedScenarios) {
+        simulatedScenarios = [...selectedScenarios];
+    }
+
+    // If in compare mode, update compare mode instead
+    if (isCompareMode) {
+        visualizeCompareMode(showLoading);
+        return;
+    }
+
+    // Show loading overlay only if explicitly requested (for simulate button click)
+    if (showLoading) {
+        $('#loading-overlay').removeClass('hidden');
+    }
 
     // FIXME: ##시뮬레이션 수행 시간## (milliseconds)
     // Adjust this value to control the loading duration
@@ -435,7 +582,7 @@ function visualizeSimulation() {
     clickedFeatureData = null;
 
     // Get selected layers
-    const selectedLayers = getSelectedLayerNames();
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
     if (selectedLayers.length === 0) {
         return;
     }
@@ -449,11 +596,17 @@ function visualizeSimulation() {
     // Create single map container with navigation arrows
     const mapId = 'map-1';
     const currentLayer = selectedLayers[currentScenarioIndex];
-    const currentScenario = selectedScenarios[currentScenarioIndex];
+    const currentScenario = simulatedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
-    // Check if population layer should be shown
+    // Check if population layer should be shown and update legend visibility
     const showPopulation = $('#population-2040-toggle').is(':checked');
+    // Update legend visibility based on toggle state
+    if (showPopulation) {
+        $('#population-legend').removeClass('hidden');
+    } else {
+        $('#population-legend').addClass('hidden');
+    }
 
     // Create map HTML with navigation arrows and legend
     const mapHtml = `
@@ -473,45 +626,6 @@ function visualizeSimulation() {
             <div id="${mapId}" class="map h-full">
                 <div class="map-title-overlay" title="${scenarioName}">
                     ${scenarioName} (${currentScenarioIndex + 1}/${selectedLayers.length})
-                </div>
-            </div>
-            <!-- Population Legend (shown when population layer is on) -->
-            <div id="population-legend" class="population-legend ${showPopulation ? '' : 'hidden'}">
-                <div class="legend-title">2040년 1Km 거주 격자</div>
-                <div class="legend-unit">단위 (명)</div>
-                <div class="legend-items">
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #f7fcf5; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">1 - 20</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #e5f5e0; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">20 - 100</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #c7e9c0; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">100 - 200</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #a1d99b; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">200 - 400</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #74c476; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">400 - 600</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #31a354; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">600 - 1,500</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #006d2c; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">1,500 - 3,000</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #00441b; border: 1px solid #cccccc;"></span>
-                        <span class="legend-label">3,000 - 17,642</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -566,11 +680,11 @@ function visualizeSimulation() {
  * Update map to show current scenario
  */
 async function updateMapScenario() {
-    const selectedLayers = getSelectedLayerNames();
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
     if (selectedLayers.length === 0) return;
 
     const currentLayer = selectedLayers[currentScenarioIndex];
-    const currentScenario = selectedScenarios[currentScenarioIndex];
+    const currentScenario = simulatedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
     // Update map title
@@ -579,10 +693,10 @@ async function updateMapScenario() {
     // Update WMS layer
     if (activeMaps.length > 0) {
         const map = activeMaps[0];
-        
+
         // Remove feature highlight when switching maps
         removeFeatureHighlight(map);
-        
+
         const wmsLayer = map.getLayers().getArray().find(layer =>
             layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
         );
@@ -659,9 +773,6 @@ function addPopulationLayer(map) {
 
     // Add to the top of the layer stack (push adds to the end, which renders on top)
     map.getLayers().push(wmsLayer);
-
-    // Show legend
-    $('#population-legend').removeClass('hidden');
 }
 
 /**
@@ -675,27 +786,196 @@ function removePopulationLayer(map) {
             map.removeLayer(layer);
         }
     });
-
-    // Hide legend
-    $('#population-legend').addClass('hidden');
 }
 
 /**
- * Toggle compare mode (split screen)
+ * Visualize comparison mode (2x2 grid)
+ */
+function visualizeCompareMode(showLoading = false) {
+    // Show loading overlay if requested (when simulate button is clicked)
+    if (showLoading) {
+        $('#loading-overlay').removeClass('hidden');
+    }
+
+    // Destroy all existing maps and charts
+    activeMaps.forEach(map => map.setTarget(null));
+    activeMaps = [];
+
+    // Destroy existing charts
+    if (barCharts.average) {
+        barCharts.average.destroy();
+        barCharts.average = null;
+    }
+    if (barCharts.minimum) {
+        barCharts.minimum.destroy();
+        barCharts.minimum = null;
+    }
+    if (barCharts.clicked) {
+        barCharts.clicked.destroy();
+        barCharts.clicked = null;
+    }
+    averageData = {};
+    minimumData = {};
+    clickedFeatureData = null;
+
+    // Get selected layers (only activated scenarios from "시뮬레이션 수행" button)
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
+
+    // If no layers selected, show message and return
+    if (selectedLayers.length === 0) {
+        alert('비교하기를 사용하려면 먼저 "장래 생활권 시뮬레이션 수행" 버튼을 눌러주세요.');
+        $('#compare-toggle').prop('checked', false);
+        isCompareMode = false;
+        $('#compare-label').text('Off');
+        return;
+    }
+
+    // Get regional count (k5 or k6)
+    const regionalCount = $('#regional-count-select').val();
+
+    // Build map configs with fixed order: m1(좌상), m2(우상), m3(좌하), current(우하)
+    // Always use fixed order regardless of selectedScenarios order
+    const mapConfigs = [];
+    const fixedOrder = ['m1', 'm2', 'm3']; // Fixed order for scenarios
+
+    let mapIndex = 1;
+
+    // Add scenarios in fixed order (m1, m2, m3) if they are selected
+    fixedOrder.forEach((scenario, orderIndex) => {
+        if (simulatedScenarios.includes(scenario) && SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
+            let position;
+            if (orderIndex === 0) {
+                position = '좌상'; // m1
+            } else if (orderIndex === 1) {
+                position = '우상'; // m2
+            } else {
+                position = '좌하'; // m3
+            }
+
+            mapConfigs.push({
+                id: `map-compare-${mapIndex}`,
+                layerName: SCENARIO_LAYERS[scenario][regionalCount],
+                title: SCENARIO_NAMES[scenario],
+                position: position
+            });
+            mapIndex++;
+        }
+    });
+
+    // Always add current living zone at the end (우하)
+    mapConfigs.push({
+        id: `map-compare-${mapIndex}`,
+        layerName: 'current_regional_living_zone',
+        title: '현재 생활권 (지역생활권)',
+        position: '우하'
+    });
+
+    const $mapContainer = $('#map-container');
+    $mapContainer.empty();
+
+    // Determine grid layout based on number of maps
+    const totalMaps = mapConfigs.length;
+    let gridCols = 2;
+    let gridRows = Math.ceil(totalMaps / 2);
+
+    // For 1 map: 2x1 (but we always have at least 2: 1 scenario + current)
+    // For 2 maps: 2x1 (1 scenario + current)
+    // For 3 maps: 2x2 (2 scenarios + current)
+    // For 4 maps: 2x2 (3 scenarios + current)
+
+    if (totalMaps === 2) {
+        // 2x1 layout: 1 scenario + current
+        $mapContainer.attr('class', 'grid grid-cols-2 gap-1 h-full');
+    } else {
+        // 2x2 layout: 2 or 3 scenarios + current
+        $mapContainer.attr('class', 'grid grid-cols-2 gap-1 h-full');
+    }
+
+    // Create shared view for synchronization
+    const masterView = new ol.View({
+        projection: 'EPSG:5179',
+        center: [975000, 1650000],
+        zoom: 9
+    });
+
+    // Create all 4 maps
+    mapConfigs.forEach((config, index) => {
+        const mapHtml = `
+            <div id="${config.id}-wrapper" class="map-wrapper relative h-full">
+                <div id="${config.id}" class="map h-full">
+                    <div class="map-title-overlay" title="${config.title}">
+                        ${config.title}
+                    </div>
+                </div>
+            </div>
+        `;
+        $mapContainer.append(mapHtml);
+
+        // Create map with shared view (all maps will be synchronized)
+        const newMap = createSingleMap(config.id, config.layerName, masterView);
+        activeMaps.push(newMap);
+    });
+
+    // Fit view to extent after all maps are created
+    setTimeout(() => {
+        activeMaps.forEach(map => map.updateSize());
+
+        // Add population layer to all maps if enabled
+        const showPopulation = $('#population-2040-toggle').is(':checked');
+        if (showPopulation) {
+            activeMaps.forEach(map => {
+                addPopulationLayer(map);
+            });
+        }
+
+        // Fit to first map's extent (first activated scenario)
+        const firstLayerName = `${GEOSERVER_WORKSPACE}:${mapConfigs[0].layerName}`;
+        getLayerExtentFromCapabilities(firstLayerName).then(extent => {
+            if (extent) {
+                masterView.fit(extent, { padding: [50, 50, 50, 50], duration: 500 });
+            } else {
+                const defaultExtent = [900000, 1550000, 1050000, 1750000];
+                masterView.fit(defaultExtent, { padding: [50, 50, 50, 50], duration: 500 });
+            }
+        });
+
+        // Initialize bar charts in compare mode
+        const startTime = Date.now();
+        setTimeout(async () => {
+            await fetchAndDisplayChartData();
+
+            // Hide loading overlay if it was shown
+            if (showLoading) {
+                const elapsedTime = Date.now() - startTime;
+                const remainingTime = Math.max(0, 1500 - elapsedTime);
+                setTimeout(() => {
+                    $('#loading-overlay').addClass('hidden');
+                }, remainingTime);
+            }
+        }, 100);
+    }, 100);
+}
+
+/**
+ * Toggle compare mode (2x2 grid or single map)
  */
 function toggleCompareMode() {
     isCompareMode = !isCompareMode;
+    const isChecked = isCompareMode;
+    $('#compare-label').text(isChecked ? 'On' : 'Off');
 
     if (isCompareMode) {
-        // Split screen mode - show 2 maps side by side
-        // TODO: Implement split screen visualization
-        $('#compare-button').addClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white')
-            .removeClass('bg-gray-200 text-gray-700');
+        // 2x2 comparison mode
+        // Show chart panel in compare mode (charts should work)
+        $('#chart-panel').removeClass('hidden');
+        visualizeCompareMode();
     } else {
-        // Single map mode
-        $('#compare-button').removeClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white')
-            .addClass('bg-gray-200 text-gray-700');
-        visualizeSimulation();
+        // Single map mode - return to m1 scenario
+        // Show chart panel in single map mode
+        $('#chart-panel').removeClass('hidden');
+        // Don't show loading overlay when toggling off compare mode
+        // Don't update simulatedScenarios when toggling compare mode (keep existing simulated scenarios)
+        visualizeSimulation(false, false);
     }
 }
 
@@ -816,6 +1096,26 @@ function initBarChart(chartKey, canvasId, labels) {
             labels: labels,
             datasets: []
         },
+        plugins: [{
+            id: 'increase-legend-spacing',
+            beforeInit: function (chart) {
+                // Get reference to the original fit function
+                const originalFit = chart.legend.fit;
+                // Override the fit function
+                chart.legend.fit = function fit() {
+                    // Call original function and bind scope in order to use `this` correctly inside it
+                    originalFit.bind(chart.legend)();
+                    // Change the height as suggested in another answers
+                    this.height += 10; // 범례와 차트 영역 사이 간격 추가 (값 조정 가능)
+                };
+            },
+            afterLayout: function (chart) {
+                // 범례의 왼쪽 여백 추가
+                if (chart.legend && chart.legend.left !== undefined) {
+                    chart.legend.left += 50; // 범례의 제일 좌측 spacing 추가 (값 조정 가능)
+                }
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -833,9 +1133,22 @@ function initBarChart(chartKey, canvasId, labels) {
             plugins: {
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 13,  // 범례 박스 너비 고정 (텍스트 시작 지점 통일)
+                        padding: 15,   // 범례 아이템 간격
+                        usePointStyle: false
+                    },
+                    align: 'start'  // 범례 전체를 좌측 정렬
                 }
-            }
+            },
+            // layout: {
+            //     padding: {
+            //         top: 10,   // 범례 위치 미세 조정 (값을 조정하여 위치 변경)
+            //         left: 5,
+            //         bottom: 5
+            //     }
+            // }
         }
     });
 }
@@ -1059,7 +1372,7 @@ function addClickedFeatureToCharts(regionName) {
         );
 
         barCharts.average.data.datasets.push({
-            label: regionName,
+            label: '선택지역',
             data: clickedAvgData,
             backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
             borderColor: 'rgb(255, 152, 0)',
@@ -1077,7 +1390,7 @@ function addClickedFeatureToCharts(regionName) {
         );
 
         barCharts.minimum.data.datasets.push({
-            label: regionName,
+            label: '선택지역',
             data: clickedMinData,
             backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
             borderColor: 'rgb(255, 152, 0)',
@@ -1238,22 +1551,32 @@ $(document).ready(function () {
     // 1. Initialize UI with default values
     initializeUI();
 
-    // 2. Auto-visualize on page load (default: m1, k5, population off)
+    // 2. Auto-visualize on page load with default settings (m1, k5)
+    // This shows the initial map, but subsequent changes require clicking "장래 생활권 시뮬레이션 수행" button
     setTimeout(() => {
-        visualizeSimulation();
+        // Set simulatedScenarios to match initial selectedScenarios (m1) for initial load
+        simulatedScenarios = [...selectedScenarios];
+        visualizeSimulation(false, false); // Don't show loading, but set simulatedScenarios for initial load
     }, 500);
 
     // 3. 2040년 장래인구분포 toggle
     $('#population-2040-toggle').on('change', function () {
         const isChecked = $(this).is(':checked');
         $('#population-2040-label').text(isChecked ? 'On' : 'Off');
-        // Update map if already visualized
+        // Update all maps if already visualized (support both single and compare mode)
         if (activeMaps.length > 0) {
-            const map = activeMaps[0];
+            activeMaps.forEach(map => {
+                if (isChecked) {
+                    addPopulationLayer(map);
+                } else {
+                    removePopulationLayer(map);
+                }
+            });
+            // Update legend visibility based on toggle state
             if (isChecked) {
-                addPopulationLayer(map);
+                $('#population-legend').removeClass('hidden');
             } else {
-                removePopulationLayer(map);
+                $('#population-legend').addClass('hidden');
             }
         }
     });
@@ -1286,10 +1609,15 @@ $(document).ready(function () {
     });
 
     // 6. 시뮬레이션 수행 버튼
-    $('#simulate-button').on('click', visualizeSimulation);
+    $('#simulate-button').on('click', function () {
+        // Update simulatedScenarios when simulate button is clicked
+        visualizeSimulation(true, true);
+    });
 
-    // 7. 비교하기 버튼
-    $('#compare-button').on('click', toggleCompareMode);
+    // 7. 비교하기 토글
+    $('#compare-toggle').on('change', function () {
+        toggleCompareMode();
+    });
 
     // 8. Intent Modal is now handled by intent-modal.js (loaded before this file)
 });
