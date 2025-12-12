@@ -110,6 +110,57 @@ const REVERSE_INDICATORS = {
     ]
 };
 
+// 약어 매핑: { indicatorKey: abbreviation }
+// 콤팩트성: C1, C2, C3, C4
+// 네트워크성: N1, N2, N3, N4, N5, N6
+// 생활편리성: L1, L2, L3, L4, L5
+const ABBREVIATION_MAPPING = {
+    basic: {
+        // 콤팩트성 (4개)
+        'cp_c_pratio_23': 'C1',
+        'cp_fac_agg_23': 'C2',
+        'cp_ngh_fac_dist_cor_avg_23': 'C3',
+        'cp_ngh_fac_c_sat_ratio_23': 'C4',
+        // 네트워크성 (6개)
+        'nt_uc_road_mins_22': 'N1',
+        'nt_uc_pub_trans_mins_23': 'N2',
+        'nt_rd_acc_1hr_center_cnt_22': 'N3',
+        'nt_pt_acc_1hr_center_cnt_23': 'N4',
+        'nt_rd_acc_30m_pgrid_ratio_23': 'N5',
+        'nt_pt_within_30m_rgrid_ratio_23': 'N6',
+        // 생활편리성 (4개)
+        'lv_rd_acc_over_30m_pop_ratio_23': 'L1',
+        'lv_pt_acc_over_30m_pop_ratio_23': 'L2',
+        'lv_fd_medic_BCcard_ratio_23': 'L3',
+        'lv_uc_add_fac_type_cnt_23': 'L4'
+    },
+    regional: {
+        // 콤팩트성 (4개)
+        'c_pop_ratio_23': 'C1',
+        'hg_fac_agg_23': 'C2',
+        'hg_fac_avg_pw_dist_km_23': 'C3',
+        'hg_fac_sat_ratio_23': 'C4',
+        // 네트워크성 (6개)
+        'daegu_rd_time_mins_25': 'N1',
+        'daegu_pt_rd_time_mins_25': 'N2',
+        'c_90m_rd_acc_cnt_23': 'N3',
+        'c_90m_pt_acc_cnt_23': 'N4',
+        'nc_60m_rd_acc_ratio_23': 'N5',
+        'nc_60m_pt_acc_ratio_23': 'N6',
+        // 생활편리성 (5개)
+        'within_food_med_trip_ratio_23': 'L1',
+        'r90m_rd_add_hg_fac_type_cnt_23': 'L2',
+        'r90m_pt_add_hg_fac_type_cnt_23': 'L3',
+        'rd_over_1h_pop_ratio_23': 'L4',
+        'pt_over_1h_pop_ratio_23': 'L5'
+    }
+};
+
+// 약어 가져오기 함수
+function getAbbreviation(indicatorKey) {
+    return ABBREVIATION_MAPPING[currentLevel]?.[indicatorKey] || null;
+}
+
 // Column mapping: { columnName: koreanName }
 const COLUMN_MAPPING = {
     basic: {
@@ -909,8 +960,8 @@ function updateIndicatorsUI() {
                         전체 선택
                     </button>
                 </div>
-                <!-- Responsive Grid for indicators: 2 columns on all screens -->
-                <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                <!-- Responsive Grid for indicators: 1 column (1단 정렬) -->
+                <div class="grid grid-cols-1 gap-y-1">
         `;
 
         indicators.forEach(indicator => {
@@ -918,11 +969,15 @@ function updateIndicatorsUI() {
             const id = `chk-${indicator.replace(/[\s\(\)\/]/g, '_')}`;
             // Get Korean name from mapping, fallback to indicator if not found
             const koreanName = COLUMN_MAPPING[currentLevel][indicator] || indicator;
+            // Get abbreviation if available (콤팩트성, 네트워크성, 생활편리성만)
+            const abbreviation = getAbbreviation(indicator);
+            // Display with abbreviation if available
+            const displayName = abbreviation ? `${koreanName} [${abbreviation}]` : koreanName;
             categoryHtml += `
                 <div class="flex items-center">
                     <input id="${id}" type="checkbox" name="indicator" value="${indicator}" class="h-4 w-4 text-sky-500 border-gray-300 bg-white rounded focus:ring-sky-500 focus:ring-2 cursor-pointer">
                     <!-- Use text-xs for smaller font and title for full name, truncate long names -->
-                    <label for="${id}" class="ml-2 block text-xs text-gray-700 hover:text-sky-600 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${koreanName}</label>
+                    <label for="${id}" class="ml-2 block text-xs text-gray-700 hover:text-sky-600 cursor-pointer truncate transition-colors duration-200" title="${koreanName}">${displayName}</label>
                 </div>
             `;
         });
@@ -1343,11 +1398,17 @@ async function initRadarChartForMap(mapId) {
                         font: { size: 9 },
                         padding: 5,
                         callback: function (label) {
-                            // Shorten labels to prevent overlap
-                            const mapping = COLUMN_MAPPING[currentLevel];
-                            const shortLabel = label.split(' ')[0];
-                            // Try to get Korean name if available
-                            return mapping[shortLabel] ? mapping[shortLabel].substring(0, 8) : shortLabel.substring(0, 8);
+                            // 방사형 차트에서는 약어만 표시
+                            // label은 indicatorKey 그대로임
+                            const indicatorKey = label;
+                            const abbreviation = getAbbreviation(indicatorKey);
+                            // 약어가 있으면 약어만 표시, 없으면 원래 로직 사용 (기본현황 등)
+                            if (abbreviation) {
+                                return abbreviation;
+                            }
+                            // 약어가 없는 경우 (기본현황 등) - 한국어 이름의 앞 8자만 표시
+                            const koreanName = COLUMN_MAPPING[currentLevel][indicatorKey];
+                            return koreanName ? koreanName.substring(0, 8) : indicatorKey.substring(0, 8);
                         }
                     },
                     ticks: { display: false }
