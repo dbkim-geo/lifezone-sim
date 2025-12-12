@@ -94,6 +94,24 @@ body {
     flex: 1;
 }
 
+/* 방사형 차트 안내 메시지 */
+.radar-chart-info-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.radar-chart-info-message.hidden {
+    display: none;
+}
+
 /* Map legend styling (same as simulation page) */
 .map-legend {
     position: absolute;

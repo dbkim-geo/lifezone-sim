@@ -313,6 +313,27 @@ function getDiagnosticIndicators() {
     return diagnosticIndicators;
 }
 
+/**
+ * Check if only 기본현황 indicators are selected (no diagnostic indicators)
+ * @returns {boolean} True if only 기본현황 indicators are selected
+ */
+function hasOnlyBasicStatusIndicators() {
+    if (selectedIndicators.length === 0) {
+        return false; // Default behavior shows diagnostic indicators
+    }
+    const data = MOCK_DATA[currentLevel];
+    const basicStatusIndicators = data.categories["기본현황"] || [];
+    const diagnosticIndicators = getDiagnosticIndicators();
+
+    // Check if all selected indicators are from 기본현황
+    const allSelectedAreBasic = selectedIndicators.every(ind => basicStatusIndicators.includes(ind));
+    // Check if any diagnostic indicator is selected
+    const hasDiagnostic = selectedIndicators.some(ind => diagnosticIndicators.includes(ind));
+
+    // Show message only if all selected are 기본현황 and no diagnostic indicators are selected
+    return allSelectedAreBasic && !hasDiagnostic;
+}
+
 
 // Mock GeoJSON data (simple square features for demonstration)
 // Note: This is not used anymore with WMS, but kept for compatibility
@@ -1358,6 +1379,43 @@ async function initRadarChartForMap(mapId) {
         return;
     }
 
+    // Check if only 기본현황 indicators are selected (no diagnostic indicators) and show/hide info message
+    const onlyBasicStatus = hasOnlyBasicStatusIndicators();
+    const chartOverlay = canvas.closest('.radar-chart-overlay');
+    if (chartOverlay) {
+        let infoMessage = chartOverlay.querySelector('.radar-chart-info-message');
+        if (onlyBasicStatus) {
+            if (!infoMessage) {
+                infoMessage = document.createElement('div');
+                infoMessage.className = 'radar-chart-info-message';
+                infoMessage.innerHTML = `
+                    <div class="flex items-center justify-center h-full">
+                        <div class="text-center px-4 py-6 bg-gradient-to-br from-sky-50 to-blue-50 rounded-lg border border-sky-200 shadow-sm">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-sm font-semibold text-sky-700 mb-1">방사형 차트 안내</p>
+                            <p class="text-xs text-gray-600 leading-relaxed">
+                                기본현황 지표는 방사형 차트에<br/>
+                                표시되지 않습니다.<br/>
+                                <span class="font-medium text-sky-600">콤팩트성, 네트워크성, 생활편리성</span><br/>
+                                지표만 표시됩니다.
+                            </p>
+                        </div>
+                    </div>
+                `;
+                chartOverlay.insertBefore(infoMessage, canvas);
+            }
+            infoMessage.classList.remove('hidden');
+            canvas.style.display = 'none';
+        } else {
+            if (infoMessage) {
+                infoMessage.classList.add('hidden');
+            }
+            canvas.style.display = 'block';
+        }
+    }
+
     const ctx = canvas.getContext('2d');
 
     // Fetch actual average data
@@ -1504,6 +1562,45 @@ async function updateRadarChartWithFeature(mapId, regionName, props) {
     if (!chart) {
         console.warn(`Chart not found for map: ${mapId}`);
         return;
+    }
+
+    // Check if only 기본현황 indicators are selected (no diagnostic indicators) and show/hide info message
+    const onlyBasicStatus = hasOnlyBasicStatusIndicators();
+    const chartCanvas = chart.canvas;
+    const chartOverlay = chartCanvas.closest('.radar-chart-overlay');
+    if (chartOverlay) {
+        let infoMessage = chartOverlay.querySelector('.radar-chart-info-message');
+        if (onlyBasicStatus) {
+            if (!infoMessage) {
+                infoMessage = document.createElement('div');
+                infoMessage.className = 'radar-chart-info-message';
+                infoMessage.innerHTML = `
+                    <div class="flex items-center justify-center h-full">
+                        <div class="text-center px-4 py-6 bg-gradient-to-br from-sky-50 to-blue-50 rounded-lg border border-sky-200 shadow-sm">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-sm font-semibold text-sky-700 mb-1">방사형 차트 안내</p>
+                            <p class="text-xs text-gray-600 leading-relaxed">
+                                기본현황 지표는 방사형 차트에<br/>
+                                표시되지 않습니다.<br/>
+                                <span class="font-medium text-sky-600">콤팩트성, 네트워크성, 생활편리성</span><br/>
+                                지표만 표시됩니다.
+                            </p>
+                        </div>
+                    </div>
+                `;
+                chartOverlay.insertBefore(infoMessage, chartCanvas);
+            }
+            infoMessage.classList.remove('hidden');
+            chartCanvas.style.display = 'none';
+            return; // Don't update chart if 기본현황 is selected
+        } else {
+            if (infoMessage) {
+                infoMessage.classList.add('hidden');
+            }
+            chartCanvas.style.display = 'block';
+        }
     }
 
     // Get only selected diagnostic indicators
