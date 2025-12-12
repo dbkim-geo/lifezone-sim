@@ -24,6 +24,16 @@ def get_css_version(css_filename: str) -> str:
         return str(int(mtime))
     return "1"  # 파일이 없으면 기본값
 
+# JavaScript 파일 버전 가져오기 (수정 시간 기반)
+def get_js_version(js_filename: str) -> str:
+    """JavaScript 파일의 수정 시간을 기반으로 버전 번호 생성 (노캐싱용)"""
+    js_path = Path(f"static/js/{js_filename}")
+    if js_path.exists():
+        # 파일 수정 시간을 타임스탬프로 변환
+        mtime = js_path.stat().st_mtime
+        return str(int(mtime))
+    return "1"  # 파일이 없으면 기본값
+
 # === 라우팅 ===
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -36,14 +46,16 @@ async def index(request: Request):
 async def current(request: Request):
     return templates.TemplateResponse("current.html", {
         "request": request,
-        "css_version": get_css_version("current.css")
+        "css_version": get_css_version("current.css"),
+        "js_version": get_js_version("intent-modal.js")
     })
 
 @app.get("/simulation", response_class=HTMLResponse)
 async def simulation(request: Request):
     return templates.TemplateResponse("simulation.html", {
         "request": request,
-        "css_version": get_css_version("simulation.css")
+        "css_version": get_css_version("simulation.css"),
+        "js_version": get_js_version("intent-modal.js")
     })
 
 @app.get("/layer/{layer_name}")

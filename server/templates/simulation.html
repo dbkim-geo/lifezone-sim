@@ -203,7 +203,16 @@
 
     <!-- Custom JavaScript -->
     <!-- 기획의도 모달 (공통 모듈) -->
-    <script src="/static/js/intent-modal.js"></script>
+    <script src="/static/js/intent-modal.js?v={{ js_version }}"></script>
+    <script>
+        // 장래생활권 페이지에서는 장래생활권 탭을 기본으로 표시
+        document.addEventListener('DOMContentLoaded', function() {
+            // 기존 초기화 제거하고 장래생활권 탭으로 재초기화
+            if (typeof initIntentModal === 'function') {
+                initIntentModal('future');
+            }
+        });
+    </script>
     <script src="/static/js/simulation.js"></script>
 
 </body>
