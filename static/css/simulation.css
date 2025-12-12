@@ -47,11 +47,14 @@ body {
     background: rgba(241, 245, 249, 0.5);
 }
 
-/* Map title overlay styling */
+/* Map title overlay styling - 지도 좌상단 타이틀 박스 위치 조정 */
 .map-title-overlay {
     position: absolute;
+    /* 좌상단 타이틀 박스 위치: top과 left 값을 조정하여 위치 변경 가능 */
     top: 10px;
+    /* 상단에서의 거리 (픽셀 단위) */
     left: 10px;
+    /* 좌측에서의 거리 (픽셀 단위) */
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 6px;

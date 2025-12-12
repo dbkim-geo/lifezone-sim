@@ -488,6 +488,11 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
 
     // 4. Create Map Instance
     // Note: OSM base layer uses EPSG:3857, but OpenLayers will handle projection automatically
+    // Remove default zoom controls (줌인/아웃 버튼 제거)
+    const defaultControls = ol.control.defaults({
+        zoom: false  // 줌 컨트롤 제거
+    });
+
     const newMap = new ol.Map({
         target: targetId,
         layers: [
@@ -495,7 +500,8 @@ function createSingleMap(targetId, indicatorKey, masterView = null) {
             // new ol.layer.Tile({ source: new ol.source.OSM(), zIndex: 0 }),
             wmsLayer
         ],
-        view: view
+        view: view,
+        controls: defaultControls
     });
 
     // Add error handling and logging for WMS layer (after map is created)

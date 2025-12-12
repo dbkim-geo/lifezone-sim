@@ -20,7 +20,7 @@
     <!-- Configuration (must be loaded before current.js) -->
     <script src="/static/js/config.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/current.css">
+    <link rel="stylesheet" href="/static/css/current.css?v={{ css_version }}">
 </head>
 <body class="bg-gradient-to-br from-gray-100 via-gray-50 to-blue-50 min-h-screen flex flex-col font-sans">
 
@@ -59,7 +59,7 @@
 
             <!-- 2. 지표 선택 (Dynamic Checkboxes - 2 Column Grid) -->
             <div class="mb-2 border-t border-sky-200 pt-2">
-                <label class="block text-sm font-medium text-sky-600 mb-1">시각화 지표 선택 (최대 4개)</label>
+                <label class="block text-sm font-medium text-sky-600 mb-1">시각화 지표 선택</label>
                 <div id="indicator-selection" class="">
                     <!-- Dynamic Checkboxes will be inserted here -->
                 </div>

@@ -137,10 +137,16 @@ function createSingleMap(targetId, layerName, masterView = null) {
     });
 
     // Create Map Instance
+    // Remove default zoom controls (줌인/아웃 버튼 제거)
+    const defaultControls = ol.control.defaults({
+        zoom: false  // 줌 컨트롤 제거
+    });
+    
     const newMap = new ol.Map({
         target: targetId,
         layers: [wmsLayer],
-        view: view
+        view: view,
+        controls: defaultControls
     });
 
     // Add error handling for WMS layer
