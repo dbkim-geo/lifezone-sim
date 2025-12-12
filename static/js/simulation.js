@@ -1,7 +1,8 @@
 // Global variables for OpenLayers and state management
 let activeMaps = []; // Array to hold all active ol.Map instances
 let currentScenarioIndex = 0; // Current scenario index for navigation
-let selectedScenarios = []; // Array of selected scenario keys
+let selectedScenarios = []; // Array of selected scenario keys (UI selection)
+let simulatedScenarios = []; // Array of scenario keys that have been actually simulated (only these are available for map navigation)
 let isCompareMode = false; // Whether in compare mode (split screen)
 let barCharts = {
     average: null,  // Average chart
@@ -483,6 +484,7 @@ function initializeUI() {
 
     // 공간구조목표 시나리오: 콤팩트성 확보만 선택 (기본값)
     selectedScenarios = ['m1'];
+    simulatedScenarios = []; // No scenarios simulated initially
     updateScenarioButtons();
 }
 
@@ -515,13 +517,15 @@ function updateScenarioButtons() {
 
 /**
  * Get layer names for selected scenarios
+ * @param {boolean} useSimulatedOnly - If true, only return layers for simulated scenarios. If false, return for selected scenarios.
  * @returns {Array} Array of layer names
  */
-function getSelectedLayerNames() {
+function getSelectedLayerNames(useSimulatedOnly = false) {
     const regionalCount = $('#regional-count-select').val();
     const layers = [];
+    const scenariosToUse = useSimulatedOnly ? simulatedScenarios : selectedScenarios;
 
-    selectedScenarios.forEach(scenario => {
+    scenariosToUse.forEach(scenario => {
         if (SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
             layers.push(SCENARIO_LAYERS[scenario][regionalCount]);
         }
@@ -532,8 +536,15 @@ function getSelectedLayerNames() {
 
 /**
  * Visualize simulation
+ * @param {boolean} showLoading - Whether to show loading overlay
+ * @param {boolean} updateSimulatedScenarios - Whether to update simulatedScenarios (only true when simulate button is clicked)
  */
-function visualizeSimulation(showLoading = true) {
+function visualizeSimulation(showLoading = true, updateSimulatedScenarios = false) {
+    // Update simulatedScenarios to match selectedScenarios only when simulate button is clicked
+    if (updateSimulatedScenarios) {
+        simulatedScenarios = [...selectedScenarios];
+    }
+
     // If in compare mode, update compare mode instead
     if (isCompareMode) {
         visualizeCompareMode(showLoading);
@@ -571,7 +582,7 @@ function visualizeSimulation(showLoading = true) {
     clickedFeatureData = null;
 
     // Get selected layers
-    const selectedLayers = getSelectedLayerNames();
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
     if (selectedLayers.length === 0) {
         return;
     }
@@ -585,7 +596,7 @@ function visualizeSimulation(showLoading = true) {
     // Create single map container with navigation arrows
     const mapId = 'map-1';
     const currentLayer = selectedLayers[currentScenarioIndex];
-    const currentScenario = selectedScenarios[currentScenarioIndex];
+    const currentScenario = simulatedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
     // Check if population layer should be shown and update legend visibility
@@ -669,11 +680,11 @@ function visualizeSimulation(showLoading = true) {
  * Update map to show current scenario
  */
 async function updateMapScenario() {
-    const selectedLayers = getSelectedLayerNames();
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
     if (selectedLayers.length === 0) return;
 
     const currentLayer = selectedLayers[currentScenarioIndex];
-    const currentScenario = selectedScenarios[currentScenarioIndex];
+    const currentScenario = simulatedScenarios[currentScenarioIndex];
     const scenarioName = SCENARIO_NAMES[currentScenario] || currentLayer;
 
     // Update map title
@@ -808,7 +819,7 @@ function visualizeCompareMode(showLoading = false) {
     clickedFeatureData = null;
 
     // Get selected layers (only activated scenarios from "시뮬레이션 수행" button)
-    const selectedLayers = getSelectedLayerNames();
+    const selectedLayers = getSelectedLayerNames(true); // Use only simulated scenarios
 
     // If no layers selected, show message and return
     if (selectedLayers.length === 0) {
@@ -831,7 +842,7 @@ function visualizeCompareMode(showLoading = false) {
 
     // Add scenarios in fixed order (m1, m2, m3) if they are selected
     fixedOrder.forEach((scenario, orderIndex) => {
-        if (selectedScenarios.includes(scenario) && SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
+        if (simulatedScenarios.includes(scenario) && SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
             let position;
             if (orderIndex === 0) {
                 position = '좌상'; // m1
@@ -963,7 +974,8 @@ function toggleCompareMode() {
         // Show chart panel in single map mode
         $('#chart-panel').removeClass('hidden');
         // Don't show loading overlay when toggling off compare mode
-        visualizeSimulation(false);
+        // Don't update simulatedScenarios when toggling compare mode (keep existing simulated scenarios)
+        visualizeSimulation(false, false);
     }
 }
 
@@ -1539,9 +1551,12 @@ $(document).ready(function () {
     // 1. Initialize UI with default values
     initializeUI();
 
-    // 2. Auto-visualize on page load (default: m1, k5, population off)
+    // 2. Auto-visualize on page load with default settings (m1, k5)
+    // This shows the initial map, but subsequent changes require clicking "장래 생활권 시뮬레이션 수행" button
     setTimeout(() => {
-        visualizeSimulation();
+        // Set simulatedScenarios to match initial selectedScenarios (m1) for initial load
+        simulatedScenarios = [...selectedScenarios];
+        visualizeSimulation(false, false); // Don't show loading, but set simulatedScenarios for initial load
     }, 500);
 
     // 3. 2040년 장래인구분포 toggle
@@ -1594,7 +1609,10 @@ $(document).ready(function () {
     });
 
     // 6. 시뮬레이션 수행 버튼
-    $('#simulate-button').on('click', visualizeSimulation);
+    $('#simulate-button').on('click', function () {
+        // Update simulatedScenarios when simulate button is clicked
+        visualizeSimulation(true, true);
+    });
 
     // 7. 비교하기 토글
     $('#compare-toggle').on('change', function () {
