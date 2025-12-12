@@ -51,9 +51,9 @@ const SCENARIO_ATTRIBUTES = {
 
 // Scenario name mapping
 const SCENARIO_NAMES = {
-    'm1': '콤팩트성 확보',
-    'm2': '콤팩트성 확보 및 배후 인구규모 확보',
-    'm3': '콤팩트성 및 네트워크성 동시 확보'
+    'm1': 'SN1',
+    'm2': 'SN2',
+    'm3': 'SN3'
 };
 
 // --- OPENLAYERS FUNCTIONS ---
@@ -1084,6 +1084,26 @@ function initBarChart(chartKey, canvasId, labels) {
             labels: labels,
             datasets: []
         },
+        plugins: [{
+            id: 'increase-legend-spacing',
+            beforeInit: function (chart) {
+                // Get reference to the original fit function
+                const originalFit = chart.legend.fit;
+                // Override the fit function
+                chart.legend.fit = function fit() {
+                    // Call original function and bind scope in order to use `this` correctly inside it
+                    originalFit.bind(chart.legend)();
+                    // Change the height as suggested in another answers
+                    this.height += 10; // 범례와 차트 영역 사이 간격 추가 (값 조정 가능)
+                };
+            },
+            afterLayout: function (chart) {
+                // 범례의 왼쪽 여백 추가
+                if (chart.legend && chart.legend.left !== undefined) {
+                    chart.legend.left += 50; // 범례의 제일 좌측 spacing 추가 (값 조정 가능)
+                }
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1101,9 +1121,22 @@ function initBarChart(chartKey, canvasId, labels) {
             plugins: {
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 13,  // 범례 박스 너비 고정 (텍스트 시작 지점 통일)
+                        padding: 15,   // 범례 아이템 간격
+                        usePointStyle: false
+                    },
+                    align: 'start'  // 범례 전체를 좌측 정렬
                 }
-            }
+            },
+            // layout: {
+            //     padding: {
+            //         top: 10,   // 범례 위치 미세 조정 (값을 조정하여 위치 변경)
+            //         left: 5,
+            //         bottom: 5
+            //     }
+            // }
         }
     });
 }
@@ -1327,7 +1360,7 @@ function addClickedFeatureToCharts(regionName) {
         );
 
         barCharts.average.data.datasets.push({
-            label: regionName,
+            label: '선택지역',
             data: clickedAvgData,
             backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
             borderColor: 'rgb(255, 152, 0)',
@@ -1345,7 +1378,7 @@ function addClickedFeatureToCharts(regionName) {
         );
 
         barCharts.minimum.data.datasets.push({
-            label: regionName,
+            label: '선택지역',
             data: clickedMinData,
             backgroundColor: 'rgba(255, 193, 7, 0.6)', // Yellow/Orange
             borderColor: 'rgb(255, 152, 0)',
