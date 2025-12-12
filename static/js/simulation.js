@@ -202,7 +202,15 @@ function createSingleMap(targetId, layerName, masterView = null) {
  * @param {string} mapId
  * @param {string} layerName Full layer name (workspace:layer)
  */
-async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
+async function handleMapClickWithWMS(event, mapInstance, mapId, fullLayerName) {
+    // Get layer name from map instance
+    const layerName = mapInstance.get('layerName');
+
+    // Don't respond to clicks on current_regional_living_zone
+    if (layerName === 'current_regional_living_zone') {
+        return;
+    }
+
     const viewResolution = mapInstance.getView().getResolution();
     const wmsLayer = mapInstance.getLayers().getArray().find(layer =>
         layer instanceof ol.layer.Image && layer.getSource() instanceof ol.source.ImageWMS
@@ -210,7 +218,12 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
 
     if (!wmsLayer) {
         hideAttributePopup();
-        removeFeatureHighlight(mapInstance);
+        // In compare mode, only remove from this map; in single mode, remove from all
+        if (isCompareMode) {
+            removeFeatureHighlight(mapInstance);
+        } else {
+            removeFeatureHighlightFromAllMaps();
+        }
         return;
     }
 
@@ -233,35 +246,53 @@ async function handleMapClickWithWMS(event, mapInstance, mapId, layerName) {
                     const feature = data.features[0];
                     const props = feature.properties;
 
-                    // Highlight the clicked feature
-                    highlightClickedFeature(mapInstance, feature.geometry);
+                    // In compare mode: remove highlights from all maps first, then highlight only this map
+                    // In single map mode: just highlight this map
+                    if (isCompareMode) {
+                        removeFeatureHighlightFromAllMaps();
+                    }
 
-                    // Update charts with clicked feature data
+                    // Highlight the clicked feature only on this map (no syncing)
+                    highlightClickedFeature(mapInstance, feature.geometry, false);
+
+                    // Update charts with clicked feature data (only for scenario layers, not current)
                     const regionName = props.nm || props.name || props.지역명 || props.NAME || '지역';
                     await updateChartsWithClickedFeature(regionName, event.coordinate);
                 } else {
-                    removeFeatureHighlight(mapInstance);
+                    removeFeatureHighlightFromAllMaps();
                     resetClickedFeatureFromCharts();
                 }
             })
             .catch(error => {
-                removeFeatureHighlight(mapInstance);
+                // In compare mode, only remove from this map; in single mode, remove from all
+                if (isCompareMode) {
+                    removeFeatureHighlight(mapInstance);
+                } else {
+                    removeFeatureHighlightFromAllMaps();
+                }
             });
     } else {
-        removeFeatureHighlight(mapInstance);
+        // In compare mode, only remove from this map; in single mode, remove from all
+        if (isCompareMode) {
+            removeFeatureHighlight(mapInstance);
+        } else {
+            removeFeatureHighlightFromAllMaps();
+        }
     }
 }
 
 // Global variables for feature highlight
-let highlightOverlay = null;
+// Store highlight overlay for each map (for compare mode)
+let highlightOverlays = {}; // { mapId: vectorLayer }
 
 /**
  * Highlight the clicked feature with an overlay
  * @param {ol.Map} map Map instance
  * @param {Object} geometry Feature geometry from GeoJSON
+ * @param {boolean} syncToAllMaps (deprecated, kept for compatibility but not used)
  */
-function highlightClickedFeature(map, geometry) {
-    // Remove existing highlight
+function highlightClickedFeature(map, geometry, syncToAllMaps = false) {
+    // Remove existing highlight from this map
     removeFeatureHighlight(map);
 
     if (!geometry) {
@@ -329,7 +360,88 @@ function highlightClickedFeature(map, geometry) {
         });
 
         map.addLayer(vectorLayer);
-        highlightOverlay = vectorLayer;
+
+        // Store highlight overlay for this map
+        const mapId = map.getTarget() || 'default';
+        highlightOverlays[mapId] = vectorLayer;
+    } catch (error) {
+        console.error('Error creating highlight:', error);
+    }
+}
+
+/**
+ * Highlight feature on a specific map (internal helper)
+ * @param {ol.Map} map Map instance
+ * @param {Object} geometry Feature geometry from GeoJSON
+ * @param {boolean} storeGeometry Whether to store geometry for syncing
+ */
+function highlightClickedFeatureOnMap(map, geometry, storeGeometry = false) {
+    // Remove existing highlight from this map
+    removeFeatureHighlight(map);
+
+    if (!geometry) {
+        return;
+    }
+
+    try {
+        // Create a vector layer for highlighting
+        const geoJSONFormat = new ol.format.GeoJSON();
+
+        // Check if geometry coordinates look like they're already in EPSG:5179
+        const sampleCoord = geometry.coordinates;
+        let isWGS84 = false;
+
+        if (sampleCoord && sampleCoord.length > 0) {
+            const firstCoord = Array.isArray(sampleCoord[0][0]) ? sampleCoord[0][0] : sampleCoord[0];
+            if (firstCoord && firstCoord.length >= 2) {
+                const lon = firstCoord[0];
+                const lat = firstCoord[1];
+                if (lon >= 100 && lon <= 150 && lat >= 30 && lat <= 45) {
+                    isWGS84 = true;
+                }
+            }
+        }
+
+        // Transform geometry based on detected coordinate system
+        const features = geoJSONFormat.readFeatures({
+            type: 'FeatureCollection',
+            features: [{
+                type: 'Feature',
+                geometry: geometry
+            }]
+        }, {
+            dataProjection: isWGS84 ? 'EPSG:4326' : 'EPSG:5179',
+            featureProjection: 'EPSG:5179'
+        });
+
+        if (!features || features.length === 0) {
+            return;
+        }
+
+        const vectorSource = new ol.source.Vector({
+            features: features
+        });
+
+        const highlightStyle = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: '#89FDFD',
+                width: 6,
+                lineCap: 'round',
+                lineJoin: 'round'
+            })
+        });
+
+        const vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: highlightStyle,
+            zIndex: 10000
+        });
+
+        map.addLayer(vectorLayer);
+
+        // Store highlight overlay for this map
+        const mapId = map.getTarget() || 'default';
+        highlightOverlays[mapId] = vectorLayer;
     } catch (error) {
         console.error('Error creating highlight:', error);
     }
@@ -340,10 +452,20 @@ function highlightClickedFeature(map, geometry) {
  * @param {ol.Map} map Map instance
  */
 function removeFeatureHighlight(map) {
-    if (highlightOverlay) {
-        map.removeLayer(highlightOverlay);
-        highlightOverlay = null;
+    const mapId = map.getTarget() || 'default';
+    if (highlightOverlays[mapId]) {
+        map.removeLayer(highlightOverlays[mapId]);
+        delete highlightOverlays[mapId];
     }
+}
+
+/**
+ * Remove feature highlight from all maps
+ */
+function removeFeatureHighlightFromAllMaps() {
+    activeMaps.forEach(map => {
+        removeFeatureHighlight(map);
+    });
 }
 
 // --- UI & STATE MANAGEMENT FUNCTIONS ---
@@ -806,12 +928,20 @@ function visualizeCompareMode(showLoading = false) {
             }
         });
 
-        // Hide loading overlay if it was shown
-        if (showLoading) {
-            setTimeout(() => {
-                $('#loading-overlay').addClass('hidden');
-            }, 500);
-        }
+        // Initialize bar charts in compare mode
+        const startTime = Date.now();
+        setTimeout(async () => {
+            await fetchAndDisplayChartData();
+
+            // Hide loading overlay if it was shown
+            if (showLoading) {
+                const elapsedTime = Date.now() - startTime;
+                const remainingTime = Math.max(0, 1500 - elapsedTime);
+                setTimeout(() => {
+                    $('#loading-overlay').addClass('hidden');
+                }, remainingTime);
+            }
+        }, 100);
     }, 100);
 }
 
@@ -825,8 +955,8 @@ function toggleCompareMode() {
 
     if (isCompareMode) {
         // 2x2 comparison mode
-        // Hide chart panel in compare mode
-        $('#chart-panel').addClass('hidden');
+        // Show chart panel in compare mode (charts should work)
+        $('#chart-panel').removeClass('hidden');
         visualizeCompareMode();
     } else {
         // Single map mode - return to m1 scenario
