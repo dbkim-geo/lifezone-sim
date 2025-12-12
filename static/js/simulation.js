@@ -411,9 +411,17 @@ function getSelectedLayerNames() {
 /**
  * Visualize simulation
  */
-function visualizeSimulation() {
-    // Show loading overlay
-    $('#loading-overlay').removeClass('hidden');
+function visualizeSimulation(showLoading = true) {
+    // If in compare mode, update compare mode instead
+    if (isCompareMode) {
+        visualizeCompareMode(showLoading);
+        return;
+    }
+
+    // Show loading overlay only if explicitly requested (for simulate button click)
+    if (showLoading) {
+        $('#loading-overlay').removeClass('hidden');
+    }
 
     // FIXME: ##시뮬레이션 수행 시간## (milliseconds)
     // Adjust this value to control the loading duration
@@ -632,9 +640,6 @@ function addPopulationLayer(map) {
 
     // Add to the top of the layer stack (push adds to the end, which renders on top)
     map.getLayers().push(wmsLayer);
-
-    // Show legend
-    $('#population-legend').removeClass('hidden');
 }
 
 /**
@@ -648,27 +653,187 @@ function removePopulationLayer(map) {
             map.removeLayer(layer);
         }
     });
-
-    // Hide legend
-    $('#population-legend').addClass('hidden');
 }
 
 /**
- * Toggle compare mode (split screen)
+ * Visualize comparison mode (2x2 grid)
+ */
+function visualizeCompareMode(showLoading = false) {
+    // Show loading overlay if requested (when simulate button is clicked)
+    if (showLoading) {
+        $('#loading-overlay').removeClass('hidden');
+    }
+
+    // Destroy all existing maps and charts
+    activeMaps.forEach(map => map.setTarget(null));
+    activeMaps = [];
+
+    // Destroy existing charts
+    if (barCharts.average) {
+        barCharts.average.destroy();
+        barCharts.average = null;
+    }
+    if (barCharts.minimum) {
+        barCharts.minimum.destroy();
+        barCharts.minimum = null;
+    }
+    if (barCharts.clicked) {
+        barCharts.clicked.destroy();
+        barCharts.clicked = null;
+    }
+    averageData = {};
+    minimumData = {};
+    clickedFeatureData = null;
+
+    // Get selected layers (only activated scenarios from "시뮬레이션 수행" button)
+    const selectedLayers = getSelectedLayerNames();
+
+    // If no layers selected, show message and return
+    if (selectedLayers.length === 0) {
+        alert('비교하기를 사용하려면 먼저 "장래 생활권 시뮬레이션 수행" 버튼을 눌러주세요.');
+        $('#compare-toggle').prop('checked', false);
+        isCompareMode = false;
+        $('#compare-label').text('Off');
+        return;
+    }
+
+    // Get regional count (k5 or k6)
+    const regionalCount = $('#regional-count-select').val();
+
+    // Build map configs with fixed order: m1(좌상), m2(우상), m3(좌하), current(우하)
+    // Always use fixed order regardless of selectedScenarios order
+    const mapConfigs = [];
+    const fixedOrder = ['m1', 'm2', 'm3']; // Fixed order for scenarios
+
+    let mapIndex = 1;
+
+    // Add scenarios in fixed order (m1, m2, m3) if they are selected
+    fixedOrder.forEach((scenario, orderIndex) => {
+        if (selectedScenarios.includes(scenario) && SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
+            let position;
+            if (orderIndex === 0) {
+                position = '좌상'; // m1
+            } else if (orderIndex === 1) {
+                position = '우상'; // m2
+            } else {
+                position = '좌하'; // m3
+            }
+
+            mapConfigs.push({
+                id: `map-compare-${mapIndex}`,
+                layerName: SCENARIO_LAYERS[scenario][regionalCount],
+                title: SCENARIO_NAMES[scenario],
+                position: position
+            });
+            mapIndex++;
+        }
+    });
+
+    // Always add current living zone at the end (우하)
+    mapConfigs.push({
+        id: `map-compare-${mapIndex}`,
+        layerName: 'current_regional_living_zone',
+        title: '현재 생활권 (지역생활권)',
+        position: '우하'
+    });
+
+    const $mapContainer = $('#map-container');
+    $mapContainer.empty();
+
+    // Determine grid layout based on number of maps
+    const totalMaps = mapConfigs.length;
+    let gridCols = 2;
+    let gridRows = Math.ceil(totalMaps / 2);
+
+    // For 1 map: 2x1 (but we always have at least 2: 1 scenario + current)
+    // For 2 maps: 2x1 (1 scenario + current)
+    // For 3 maps: 2x2 (2 scenarios + current)
+    // For 4 maps: 2x2 (3 scenarios + current)
+
+    if (totalMaps === 2) {
+        // 2x1 layout: 1 scenario + current
+        $mapContainer.attr('class', 'grid grid-cols-2 gap-1 h-full');
+    } else {
+        // 2x2 layout: 2 or 3 scenarios + current
+        $mapContainer.attr('class', 'grid grid-cols-2 gap-1 h-full');
+    }
+
+    // Create shared view for synchronization
+    const masterView = new ol.View({
+        projection: 'EPSG:5179',
+        center: [975000, 1650000],
+        zoom: 9
+    });
+
+    // Create all 4 maps
+    mapConfigs.forEach((config, index) => {
+        const mapHtml = `
+            <div id="${config.id}-wrapper" class="map-wrapper relative h-full">
+                <div id="${config.id}" class="map h-full">
+                    <div class="map-title-overlay" title="${config.title}">
+                        ${config.title}
+                    </div>
+                </div>
+            </div>
+        `;
+        $mapContainer.append(mapHtml);
+
+        // Create map with shared view (all maps will be synchronized)
+        const newMap = createSingleMap(config.id, config.layerName, masterView);
+        activeMaps.push(newMap);
+    });
+
+    // Fit view to extent after all maps are created
+    setTimeout(() => {
+        activeMaps.forEach(map => map.updateSize());
+
+        // Add population layer to all maps if enabled
+        const showPopulation = $('#population-2040-toggle').is(':checked');
+        if (showPopulation) {
+            activeMaps.forEach(map => {
+                addPopulationLayer(map);
+            });
+        }
+
+        // Fit to first map's extent (first activated scenario)
+        const firstLayerName = `${GEOSERVER_WORKSPACE}:${mapConfigs[0].layerName}`;
+        getLayerExtentFromCapabilities(firstLayerName).then(extent => {
+            if (extent) {
+                masterView.fit(extent, { padding: [50, 50, 50, 50], duration: 500 });
+            } else {
+                const defaultExtent = [900000, 1550000, 1050000, 1750000];
+                masterView.fit(defaultExtent, { padding: [50, 50, 50, 50], duration: 500 });
+            }
+        });
+
+        // Hide loading overlay if it was shown
+        if (showLoading) {
+            setTimeout(() => {
+                $('#loading-overlay').addClass('hidden');
+            }, 500);
+        }
+    }, 100);
+}
+
+/**
+ * Toggle compare mode (2x2 grid or single map)
  */
 function toggleCompareMode() {
     isCompareMode = !isCompareMode;
+    const isChecked = isCompareMode;
+    $('#compare-label').text(isChecked ? 'On' : 'Off');
 
     if (isCompareMode) {
-        // Split screen mode - show 2 maps side by side
-        // TODO: Implement split screen visualization
-        $('#compare-button').addClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white')
-            .removeClass('bg-gray-200 text-gray-700');
+        // 2x2 comparison mode
+        // Hide chart panel in compare mode
+        $('#chart-panel').addClass('hidden');
+        visualizeCompareMode();
     } else {
-        // Single map mode
-        $('#compare-button').removeClass('bg-gradient-to-r from-sky-400 to-blue-400 text-white')
-            .addClass('bg-gray-200 text-gray-700');
-        visualizeSimulation();
+        // Single map mode - return to m1 scenario
+        // Show chart panel in single map mode
+        $('#chart-panel').removeClass('hidden');
+        // Don't show loading overlay when toggling off compare mode
+        visualizeSimulation(false);
     }
 }
 
@@ -1220,13 +1385,20 @@ $(document).ready(function () {
     $('#population-2040-toggle').on('change', function () {
         const isChecked = $(this).is(':checked');
         $('#population-2040-label').text(isChecked ? 'On' : 'Off');
-        // Update map if already visualized
+        // Update all maps if already visualized (support both single and compare mode)
         if (activeMaps.length > 0) {
-            const map = activeMaps[0];
+            activeMaps.forEach(map => {
+                if (isChecked) {
+                    addPopulationLayer(map);
+                } else {
+                    removePopulationLayer(map);
+                }
+            });
+            // Update legend visibility based on toggle state
             if (isChecked) {
-                addPopulationLayer(map);
+                $('#population-legend').removeClass('hidden');
             } else {
-                removePopulationLayer(map);
+                $('#population-legend').addClass('hidden');
             }
         }
     });
@@ -1261,8 +1433,10 @@ $(document).ready(function () {
     // 6. 시뮬레이션 수행 버튼
     $('#simulate-button').on('click', visualizeSimulation);
 
-    // 7. 비교하기 버튼
-    $('#compare-button').on('click', toggleCompareMode);
+    // 7. 비교하기 토글
+    $('#compare-toggle').on('change', function () {
+        toggleCompareMode();
+    });
 
     // 8. Intent Modal is now handled by intent-modal.js (loaded before this file)
 });

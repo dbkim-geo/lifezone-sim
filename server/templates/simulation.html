@@ -97,11 +97,16 @@
                 </button>
             </div>
 
-            <!-- 5. 비교하기 버튼 -->
+            <!-- 5. 비교하기 버튼 (토글) -->
             <div class="mb-2">
-                <button id="compare-button" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-gray-300">
-                    비교하기
-                </button>
+                <label class="block text-sm font-medium text-sky-600 mb-1">비교하기</label>
+                <div class="flex items-center">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="compare-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-400"></div>
+                        <span class="ml-3 text-sm text-gray-700" id="compare-label">Off</span>
+                    </label>
+                </div>
             </div>
 
             <!-- 6. 2040년 1Km 거주 격자 Legend (비교하기 버튼 아래) -->
