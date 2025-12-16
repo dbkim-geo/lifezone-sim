@@ -833,42 +833,68 @@ function visualizeCompareMode(showLoading = false) {
     // Get regional count (k5 or k6)
     const regionalCount = $('#regional-count-select').val();
 
-    // Build map configs with fixed order: m1(좌상), m2(우상), m3(좌하), current(우하)
+    // Build map configs with fixed order
+    // 2분할: current(좌), scenario(우)
+    // 4분할: current(좌상), m1(우상), m2(좌하), m3(우하)
     // Always use fixed order regardless of selectedScenarios order
     const mapConfigs = [];
     const fixedOrder = ['m1', 'm2', 'm3']; // Fixed order for scenarios
 
-    let mapIndex = 1;
-
-    // Add scenarios in fixed order (m1, m2, m3) if they are selected
-    fixedOrder.forEach((scenario, orderIndex) => {
+    // Collect scenarios that are selected
+    const selectedScenarioConfigs = [];
+    fixedOrder.forEach((scenario) => {
         if (simulatedScenarios.includes(scenario) && SCENARIO_LAYERS[scenario] && SCENARIO_LAYERS[scenario][regionalCount]) {
-            let position;
-            if (orderIndex === 0) {
-                position = '좌상'; // m1
-            } else if (orderIndex === 1) {
-                position = '우상'; // m2
-            } else {
-                position = '좌하'; // m3
-            }
-
-            mapConfigs.push({
-                id: `map-compare-${mapIndex}`,
+            selectedScenarioConfigs.push({
+                scenario: scenario,
                 layerName: SCENARIO_LAYERS[scenario][regionalCount],
-                title: SCENARIO_NAMES[scenario],
-                position: position
+                title: SCENARIO_NAMES[scenario]
             });
-            mapIndex++;
         }
     });
 
-    // Always add current living zone at the end (우하)
-    mapConfigs.push({
-        id: `map-compare-${mapIndex}`,
-        layerName: 'current_regional_living_zone',
-        title: '현재 생활권 (지역생활권)',
-        position: '우하'
-    });
+    const totalMapsCount = selectedScenarioConfigs.length + 1; // +1 for current living zone
+
+    let mapIndex = 1;
+
+    if (totalMapsCount === 2) {
+        // 2분할: current(좌), scenario(우)
+        mapConfigs.push({
+            id: `map-compare-${mapIndex}`,
+            layerName: 'current_regional_living_zone',
+            title: '현재 생활권 (2023년 지역생활권)',
+            position: '좌'
+        });
+        mapIndex++;
+
+        mapConfigs.push({
+            id: `map-compare-${mapIndex}`,
+            layerName: selectedScenarioConfigs[0].layerName,
+            title: selectedScenarioConfigs[0].title,
+            position: '우'
+        });
+    } else {
+        // 4분할 (3개 또는 4개): current(좌상), m1(우상), m2(좌하), m3(우하)
+        // Always add current living zone first (좌상)
+        mapConfigs.push({
+            id: `map-compare-${mapIndex}`,
+            layerName: 'current_regional_living_zone',
+            title: '현재 생활권 (2023년 지역생활권)',
+            position: '좌상'
+        });
+        mapIndex++;
+
+        // Add scenarios in order: m1(우상), m2(좌하), m3(우하)
+        const positions = ['우상', '좌하', '우하'];
+        selectedScenarioConfigs.forEach((config, index) => {
+            mapConfigs.push({
+                id: `map-compare-${mapIndex}`,
+                layerName: config.layerName,
+                title: config.title,
+                position: positions[index] || '우하'
+            });
+            mapIndex++;
+        });
+    }
 
     const $mapContainer = $('#map-container');
     $mapContainer.empty();
